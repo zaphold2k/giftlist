@@ -1,0 +1,84 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Parent {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  lists        GiftList[]
+}
+
+model GiftList {
+  id          String     @id @default(cuid())
+  slug        String     @unique
+  title       String
+  description String?
+  eventDate   DateTime?
+  parentId    String
+  parent      Parent     @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  items       GiftItem[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([parentId])
+}
+
+model GiftItem {
+  id             String        @id @default(cuid())
+  listId         String
+  list           GiftList      @relation(fields: [listId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  url            String?
+  imageUrl       String?
+  priority       Priority      @default(MEDIUM)
+  quantityWanted Int           @default(1)
+  position       Int           @default(0)
+  reservations   Reservation[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([listId])
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Reservation {
+  id          String            @id @default(cuid())
+  itemId      String
+  item        GiftItem          @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  // Which unit of the item this reservation occupies (0..quantityWanted-1).
+  // A hand-written partial unique index on (itemId, unitSlot) WHERE status = 'ACTIVE'
+  // makes double-booking a DB constraint violation for any quantity.
+  unitSlot    Int               @default(0)
+  guestName   String
+  guestEmail  String?
+  message     String?
+  status      ReservationStatus @default(ACTIVE)
+  createdAt   DateTime          @default(now())
+  cancelledAt DateTime?
+
+  @@index([itemId])
+  @@index([itemId, status])
+}
+
+enum ReservationStatus {
+  ACTIVE
+  CANCELLED
+}
