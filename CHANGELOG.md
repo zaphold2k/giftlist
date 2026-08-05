@@ -8,6 +8,10 @@
 - Enlaces múltiples a tienda por artículo (`GiftItemLink`): cada artículo puede listar varias opciones de compra (distintas tiendas, talles, colores), cada una con un label opcional.
 - `docker-compose.yml` para levantar la app con un solo comando, con `.env.example` como plantilla de variables.
 
+### Cambiado
+
+- La insignia de prioridad ya no se muestra para artículos de prioridad media: al ser el valor "normal", etiquetarla no aportaba nada — solo se destacan alta y baja.
+
 ### Corregido
 
 - Contraste en las páginas de login/registro: la app no declaraba `color-scheme: light`, así que el navegador aplicaba su oscurecimiento automático cuando el sistema estaba en modo oscuro.
