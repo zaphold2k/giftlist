@@ -13,9 +13,11 @@ export default async function ReservationsPage({
 }) {
   const { listId } = await params;
   const session = await auth();
+  if (!session?.user?.id) notFound();
   const list = await prisma.giftList.findUnique({
     where: { id: listId },
     include: {
+      admins: { where: { parentId: session.user.id } },
       items: {
         orderBy: { position: "asc" },
         include: {
@@ -27,7 +29,7 @@ export default async function ReservationsPage({
       },
     },
   });
-  if (!list || list.parentId !== session?.user.id) notFound();
+  if (!list || list.admins.length === 0) notFound();
 
   const itemsWithReservations = list.items.filter((i) => i.reservations.length > 0);
 

@@ -7,7 +7,16 @@ import { ItemForm } from "@/components/item-form";
 import { ItemRow } from "@/components/item-row";
 import { CopyLink } from "@/components/copy-link";
 import { DeleteListButton } from "@/components/delete-list-button";
-import { updateList, deleteList, addItem, updateItem, deleteItem } from "../../actions";
+import { ListAdmins } from "@/components/list-admins";
+import {
+  updateList,
+  deleteList,
+  addItem,
+  updateItem,
+  deleteItem,
+  addListAdmin,
+  removeListAdmin,
+} from "../../actions";
 
 export const metadata = { title: "Editar lista — giftlist" };
 
@@ -18,9 +27,11 @@ export default async function EditListPage({
 }) {
   const { listId } = await params;
   const session = await auth();
+  if (!session?.user?.id) notFound();
   const list = await prisma.giftList.findUnique({
     where: { id: listId },
     include: {
+      admins: { include: { parent: { select: { id: true, name: true, email: true } } } },
       items: {
         orderBy: { position: "asc" },
         include: {
@@ -29,7 +40,7 @@ export default async function EditListPage({
       },
     },
   });
-  if (!list || list.parentId !== session?.user.id) notFound();
+  if (!list || !list.admins.some((a) => a.parentId === session.user.id)) notFound();
 
   const totalReservations = list.items.reduce(
     (acc, item) => acc + item.reservations.length,
@@ -73,6 +84,22 @@ export default async function EditListPage({
             eventDate: list.eventDate?.toISOString().slice(0, 10),
           }}
           submitLabel="Guardar cambios"
+        />
+      </section>
+
+      <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <h2 className="mb-4 text-lg font-semibold text-zinc-900">
+          Administradores ({list.admins.length})
+        </h2>
+        <ListAdmins
+          admins={list.admins.map((a) => ({
+            id: a.id,
+            name: a.parent.name,
+            email: a.parent.email,
+            isSelf: a.parentId === session.user.id,
+          }))}
+          addAction={addListAdmin.bind(null, list.id)}
+          removeAction={removeListAdmin.bind(null, list.id)}
         />
       </section>
 

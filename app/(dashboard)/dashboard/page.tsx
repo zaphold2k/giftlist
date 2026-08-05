@@ -7,7 +7,7 @@ export const metadata = { title: "Mis listas — giftlist" };
 export default async function DashboardPage() {
   const session = await auth();
   const lists = await prisma.giftList.findMany({
-    where: { parentId: session!.user.id },
+    where: { admins: { some: { parentId: session!.user.id } } },
     orderBy: { createdAt: "desc" },
     include: {
       _count: { select: { items: true } },

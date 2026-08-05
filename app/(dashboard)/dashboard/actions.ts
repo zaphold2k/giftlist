@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { generateSlug } from "@/lib/slug";
-import { listSchema, itemSchema } from "@/lib/validation";
+import { listSchema, itemSchema, addAdminSchema } from "@/lib/validation";
 import { requireSession, requireOwnedList, requireOwnedItem } from "@/lib/authz";
 
 export type FormState = { error?: string } | undefined;
@@ -40,6 +40,7 @@ export async function createList(_prev: FormState, formData: FormData): Promise<
       description: parsed.data.description || null,
       eventDate: parsed.data.eventDate ? new Date(parsed.data.eventDate) : null,
       parentId: session.user.id,
+      admins: { create: { parentId: session.user.id } },
     },
   });
   redirect(`/dashboard/lists/${list.id}`);
@@ -132,6 +133,42 @@ export async function deleteItem(itemId: string): Promise<void> {
   const item = await requireOwnedItem(itemId);
   await prisma.giftItem.delete({ where: { id: itemId } });
   revalidatePath(`/dashboard/lists/${item.listId}`);
+}
+
+export async function addListAdmin(
+  listId: string,
+  _prev: FormState,
+  formData: FormData
+): Promise<FormState> {
+  await requireOwnedList(listId);
+  const parsed = addAdminSchema.safeParse({ email: formData.get("email") });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const email = parsed.data.email.toLowerCase();
+  const parent = await prisma.parent.findUnique({ where: { email } });
+  if (!parent) {
+    return { error: "No existe ninguna cuenta registrada con ese email." };
+  }
+
+  const existing = await prisma.giftListAdmin.findUnique({
+    where: { listId_parentId: { listId, parentId: parent.id } },
+  });
+  if (existing) {
+    return { error: "Ya es administrador de esta lista." };
+  }
+
+  await prisma.giftListAdmin.create({ data: { listId, parentId: parent.id } });
+  revalidatePath(`/dashboard/lists/${listId}`);
+  return undefined;
+}
+
+export async function removeListAdmin(listId: string, adminId: string): Promise<void> {
+  await requireOwnedList(listId);
+  const count = await prisma.giftListAdmin.count({ where: { listId } });
+  if (count <= 1) throw new Error("No se puede quitar al último administrador de la lista.");
+
+  await prisma.giftListAdmin.deleteMany({ where: { id: adminId, listId } });
+  revalidatePath(`/dashboard/lists/${listId}`);
 }
 
 export async function cancelReservation(reservationId: string): Promise<void> {

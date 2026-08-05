@@ -26,6 +26,10 @@ export const itemSchema = z.object({
   quantityWanted: z.coerce.number().int().min(1).max(99).default(1),
 });
 
+export const addAdminSchema = z.object({
+  email: z.email("Email inválido"),
+});
+
 export const reservationSchema = z.object({
   guestName: z.string().trim().min(1, "Tu nombre es obligatorio").max(100),
   guestEmail: z.union([z.email("Email inválido"), z.literal("")]).optional(),

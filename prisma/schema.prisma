@@ -11,27 +11,47 @@ datasource db {
 }
 
 model Parent {
-  id           String     @id @default(cuid())
-  email        String     @unique
-  passwordHash String
-  name         String?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  lists        GiftList[]
+  id             String          @id @default(cuid())
+  email          String          @unique
+  passwordHash   String
+  name           String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  createdLists   GiftList[]      @relation("ListCreator")
+  listAdminships GiftListAdmin[]
 }
 
 model GiftList {
-  id          String     @id @default(cuid())
-  slug        String     @unique
+  id          String          @id @default(cuid())
+  slug        String          @unique
   title       String
   description String?
   eventDate   DateTime?
+  // Original creator, kept for provenance. Access control goes through
+  // `admins` — see GiftListAdmin — not this field, since a list can have
+  // multiple registered administrators with equal rights.
   parentId    String
-  parent      Parent     @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  parent      Parent          @relation("ListCreator", fields: [parentId], references: [id], onDelete: Cascade)
+  admins      GiftListAdmin[]
   items       GiftItem[]
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 
+  @@index([parentId])
+}
+
+// Join table granting a registered Parent admin rights over a GiftList.
+// All admins have equal permissions (edit, add/remove other admins, delete
+// the list); the last remaining admin of a list cannot be removed.
+model GiftListAdmin {
+  id        String   @id @default(cuid())
+  listId    String
+  list      GiftList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  parentId  String
+  parent    Parent   @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([listId, parentId])
   @@index([parentId])
 }
 

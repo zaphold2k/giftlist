@@ -18,6 +18,7 @@ async function main() {
         title: "Lista de ejemplo para el bebé",
         description: "Algunas cosas que nos harían mucha ilusión.",
         parentId: parent.id,
+        admins: { create: { parentId: parent.id } },
         items: {
           create: [
             { name: "Carrito de paseo", priority: "HIGH", quantityWanted: 1, position: 0 },
