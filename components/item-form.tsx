@@ -2,7 +2,6 @@
 
 import { useActionState, useRef, useState } from "react";
 import type { FormState } from "@/app/(dashboard)/dashboard/actions";
-import { CATEGORIES, CATEGORY_LABELS, type ItemCategory } from "@/lib/categories";
 
 const inputClass =
   "w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-200";
@@ -16,6 +15,7 @@ function nextLinkKey() {
 export function ItemForm({
   action,
   defaults,
+  categories,
   submitLabel,
   onDone,
   resetOnSuccess,
@@ -27,9 +27,10 @@ export function ItemForm({
     links?: Link[];
     imageUrl?: string | null;
     priority?: "LOW" | "MEDIUM" | "HIGH";
-    category?: ItemCategory | null;
+    categoryId?: string | null;
     quantityWanted?: number;
   };
+  categories: { id: string; name: string }[];
   submitLabel: string;
   onDone?: () => void;
   resetOnSuccess?: boolean;
@@ -161,14 +162,14 @@ export function ItemForm({
             Categoría <span className="text-zinc-400">(opcional)</span>
           </label>
           <select
-            name="category"
-            defaultValue={defaults?.category ?? ""}
+            name="categoryId"
+            defaultValue={defaults?.categoryId ?? ""}
             className={inputClass}
           >
             <option value="">Sin categoría</option>
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {CATEGORY_LABELS[c]}
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
               </option>
             ))}
           </select>

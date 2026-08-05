@@ -7,7 +7,7 @@
 - Múltiples administradores registrados por lista (`GiftListAdmin`): todos con los mismos permisos, no se puede quitar al último administrador de una lista.
 - Enlaces múltiples a tienda por artículo (`GiftItemLink`): cada artículo puede listar varias opciones de compra (distintas tiendas, talles, colores), cada una con un label opcional.
 - `docker-compose.yml` para levantar la app con un solo comando, con `.env.example` como plantilla de variables.
-- Categorías de artículo (`Ropa`, `Juguetes`, `Higiene y cuidado`, `Alimentación`, `Paseo`, `Habitación`, `Otros`) para clasificar los regalos dentro de una lista.
+- Categorías de artículo, editables por lista: cada lista arranca con un set por defecto (Ropa, Juguetes, Higiene y cuidado, Alimentación, Paseo, Habitación, Otros) que sus administradores pueden renombrar, agregar o borrar libremente, sin afectar a otras listas.
 
 ### Cambiado
 

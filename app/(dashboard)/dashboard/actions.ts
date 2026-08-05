@@ -4,8 +4,15 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { generateSlug } from "@/lib/slug";
-import { listSchema, itemSchema, itemLinkSchema, addAdminSchema } from "@/lib/validation";
+import {
+  listSchema,
+  itemSchema,
+  itemLinkSchema,
+  addAdminSchema,
+  categorySchema,
+} from "@/lib/validation";
 import { requireSession, requireOwnedList, requireOwnedItem } from "@/lib/authz";
+import { DEFAULT_CATEGORIES } from "@/lib/categories";
 
 export type FormState = { error?: string } | undefined;
 
@@ -23,9 +30,23 @@ function parseItemForm(formData: FormData) {
     description: formData.get("description"),
     imageUrl: formData.get("imageUrl"),
     priority: formData.get("priority") ?? "MEDIUM",
-    category: formData.get("category") ?? "",
     quantityWanted: formData.get("quantityWanted") ?? 1,
   });
+}
+
+// The category select only offers the item's own list's categories, but the
+// id still needs to be checked server-side (route protection alone isn't
+// enough — see requireOwnedList/Item) so a request can't attach an item to
+// another list's category.
+async function resolveCategoryId(
+  listId: string,
+  formData: FormData
+): Promise<{ ok: true; categoryId: string | null } | { ok: false; error: string }> {
+  const raw = formData.get("categoryId");
+  if (!raw) return { ok: true, categoryId: null };
+  const category = await prisma.category.findFirst({ where: { id: String(raw), listId } });
+  if (!category) return { ok: false, error: "Categoría inválida." };
+  return { ok: true, categoryId: category.id };
 }
 
 // Store links are submitted as parallel `linkLabel[]` / `linkUrl[]` arrays,
@@ -58,6 +79,9 @@ export async function createList(_prev: FormState, formData: FormData): Promise<
       eventDate: parsed.data.eventDate ? new Date(parsed.data.eventDate) : null,
       parentId: session.user.id,
       admins: { create: { parentId: session.user.id } },
+      categories: {
+        create: DEFAULT_CATEGORIES.map((name, i) => ({ name, position: i })),
+      },
     },
   });
   redirect(`/dashboard/lists/${list.id}`);
@@ -102,6 +126,8 @@ export async function addItem(
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const parsedLinks = parseLinksForm(formData);
   if (!parsedLinks.success) return { error: parsedLinks.error };
+  const categoryResult = await resolveCategoryId(listId, formData);
+  if (!categoryResult.ok) return { error: categoryResult.error };
 
   const last = await prisma.giftItem.findFirst({
     where: { listId },
@@ -115,7 +141,7 @@ export async function addItem(
       description: parsed.data.description || null,
       imageUrl: parsed.data.imageUrl || null,
       priority: parsed.data.priority,
-      category: parsed.data.category || null,
+      categoryId: categoryResult.categoryId,
       quantityWanted: parsed.data.quantityWanted,
       position: (last?.position ?? -1) + 1,
       links: {
@@ -137,6 +163,8 @@ export async function updateItem(
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const parsedLinks = parseLinksForm(formData);
   if (!parsedLinks.success) return { error: parsedLinks.error };
+  const categoryResult = await resolveCategoryId(item.listId, formData);
+  if (!categoryResult.ok) return { error: categoryResult.error };
 
   await prisma.giftItem.update({
     where: { id: itemId },
@@ -145,7 +173,7 @@ export async function updateItem(
       description: parsed.data.description || null,
       imageUrl: parsed.data.imageUrl || null,
       priority: parsed.data.priority,
-      category: parsed.data.category || null,
+      categoryId: categoryResult.categoryId,
       quantityWanted: parsed.data.quantityWanted,
       links: {
         deleteMany: {},
@@ -161,6 +189,64 @@ export async function deleteItem(itemId: string): Promise<void> {
   const item = await requireOwnedItem(itemId);
   await prisma.giftItem.delete({ where: { id: itemId } });
   revalidatePath(`/dashboard/lists/${item.listId}`);
+}
+
+export async function addCategory(
+  listId: string,
+  _prev: FormState,
+  formData: FormData
+): Promise<FormState> {
+  await requireOwnedList(listId);
+  const parsed = categorySchema.safeParse({ name: formData.get("name") });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const existing = await prisma.category.findFirst({
+    where: { listId, name: parsed.data.name },
+  });
+  if (existing) return { error: "Ya existe una categoría con ese nombre." };
+
+  const last = await prisma.category.findFirst({
+    where: { listId },
+    orderBy: { position: "desc" },
+    select: { position: true },
+  });
+  await prisma.category.create({
+    data: { listId, name: parsed.data.name, position: (last?.position ?? -1) + 1 },
+  });
+  revalidatePath(`/dashboard/lists/${listId}`);
+  return undefined;
+}
+
+export async function renameCategory(
+  listId: string,
+  categoryId: string,
+  _prev: FormState,
+  formData: FormData
+): Promise<FormState> {
+  await requireOwnedList(listId);
+  const parsed = categorySchema.safeParse({ name: formData.get("name") });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const existing = await prisma.category.findFirst({
+    where: { listId, name: parsed.data.name, NOT: { id: categoryId } },
+  });
+  if (existing) return { error: "Ya existe una categoría con ese nombre." };
+
+  await prisma.category.updateMany({
+    where: { id: categoryId, listId },
+    data: { name: parsed.data.name },
+  });
+  revalidatePath(`/dashboard/lists/${listId}`);
+  return undefined;
+}
+
+export async function deleteCategory(listId: string, categoryId: string): Promise<void> {
+  await requireOwnedList(listId);
+  // Items in this category fall back to uncategorized (categoryId is
+  // nullable with onDelete: SetNull) — deleting a category never deletes
+  // items.
+  await prisma.category.deleteMany({ where: { id: categoryId, listId } });
+  revalidatePath(`/dashboard/lists/${listId}`);
 }
 
 export async function addListAdmin(

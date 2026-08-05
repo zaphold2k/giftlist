@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma";
 import { generateSlug } from "../lib/slug";
+import { DEFAULT_CATEGORIES } from "../lib/categories";
 
 async function main() {
   const passwordHash = await bcrypt.hash("supersecreta1", 12);
@@ -19,6 +20,9 @@ async function main() {
         description: "Algunas cosas que nos harían mucha ilusión.",
         parentId: parent.id,
         admins: { create: { parentId: parent.id } },
+        categories: {
+          create: DEFAULT_CATEGORIES.map((name, i) => ({ name, position: i })),
+        },
         items: {
           create: [
             { name: "Carrito de paseo", priority: "HIGH", quantityWanted: 1, position: 0 },

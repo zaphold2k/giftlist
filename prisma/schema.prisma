@@ -34,6 +34,7 @@ model GiftList {
   parent      Parent          @relation("ListCreator", fields: [parentId], references: [id], onDelete: Cascade)
   admins      GiftListAdmin[]
   items       GiftItem[]
+  categories  Category[]
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
@@ -63,7 +64,8 @@ model GiftItem {
   description    String?
   imageUrl       String?
   priority       Priority       @default(MEDIUM)
-  category       Category?
+  categoryId     String?
+  category       Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   quantityWanted Int            @default(1)
   position       Int            @default(0)
   links          GiftItemLink[]
@@ -72,16 +74,24 @@ model GiftItem {
   updatedAt      DateTime       @updatedAt
 
   @@index([listId])
+  @@index([categoryId])
 }
 
-enum Category {
-  ROPA
-  JUGUETES
-  HIGIENE
-  ALIMENTACION
-  PASEO
-  HABITACION
-  OTROS
+// Per-list, editable classification for items (e.g. "Ropa", "Juguetes").
+// New lists are seeded with a default set (see DEFAULT_CATEGORIES in
+// lib/categories.ts) that admins can then rename/add to/delete freely —
+// categories are not shared across lists.
+model Category {
+  id        String     @id @default(cuid())
+  listId    String
+  list      GiftList   @relation(fields: [listId], references: [id], onDelete: Cascade)
+  name      String
+  position  Int        @default(0)
+  createdAt DateTime   @default(now())
+  items     GiftItem[]
+
+  @@unique([listId, name])
+  @@index([listId])
 }
 
 // A store link where the item could be bought. An item can list several,

@@ -24,11 +24,14 @@ Un `GiftItem` puede tener varios enlaces de compra (`GiftItemLink`: `label` opci
 - Vista pública (`app/l/[slug]/page.tsx`): cada enlace se muestra como píldora clicable; si no tiene `label`, se usa el hostname de la URL como texto (`linkText()`).
 - Migración `prisma/migrations/20260805013648_item_links` incluye backfill: el `url` que tenía cada artículo pasa a ser su primer enlace, y luego se elimina la columna.
 
-## Categorías de artículo
+## Categorías de artículo (editables, por lista)
 
-Un `GiftItem` puede tener una `Category` opcional (`ROPA`, `JUGUETES`, `HIGIENE`, `ALIMENTACION`, `PASEO`, `HABITACION`, `OTROS`) para clasificarlo dentro de la lista.
+Un `GiftItem` puede tener una `Category` opcional para clasificarlo. **No es un enum fijo**: `Category` es un modelo propio, escopeado por lista (`Category.listId`), que los administradores de esa lista pueden crear/renombrar/borrar libremente — las categorías de una lista no afectan a otras.
 
-- Enum y labels centralizados en `lib/categories.ts` (`CATEGORIES`, `CATEGORY_LABELS`) — es la única fuente de verdad; tanto el `<select>` de `components/item-form.tsx` como la validación en `lib/validation.ts` la importan de ahí.
-- Es un campo opcional (nullable), sin default: no todos los artículos necesitan categoría.
-- Se muestra igual que `PriorityBadge` — nuevo componente `components/category-badge.tsx`, no se renderiza si `category` es `null` — tanto en el dashboard (`components/item-row.tsx`) como en la vista pública (`app/l/[slug]/page.tsx`).
+- `lib/categories.ts` solo exporta `DEFAULT_CATEGORIES` (Ropa, Juguetes, Higiene y cuidado, Alimentación, Paseo, Habitación, Otros): el set inicial con el que se siembra cada lista nueva (`createList` en `app/(dashboard)/dashboard/actions.ts`, y `prisma/seed.ts`), no una lista cerrada de valores válidos.
+- Gestión de categorías: acciones `addCategory`/`renameCategory`/`deleteCategory` (mismo archivo), UI en la sección "Categorías" de `app/(dashboard)/dashboard/lists/[listId]/page.tsx`, componente `components/list-categories.tsx`. Nombre único por lista (`@@unique([listId, name])`); no hay protección contra borrar la última categoría de una lista (es un estado válido, no una lista rota).
+- `GiftItem.categoryId` es nullable con `onDelete: SetNull` — borrar una categoría nunca borra los artículos, solo los deja sin categoría.
+- El `<select>` de categoría en `components/item-form.tsx` recibe la lista de categorías de la lista actual como prop (`categories`), no una constante global. `resolveCategoryId()` en `app/(dashboard)/dashboard/actions.ts` revalida server-side que el `categoryId` recibido pertenezca a esa lista (mismo motivo que `requireOwnedList`/`requireOwnedItem`: los server actions son alcanzables por POST directo).
+- Se muestra con `components/category-badge.tsx` (no se renderiza si `category` es `null`) tanto en el dashboard (`components/item-row.tsx`) como en la vista pública (`app/l/[slug]/page.tsx`).
 - No agrupa ni filtra los artículos por categoría todavía, solo los etiqueta.
+- Migración `prisma/migrations/20260805022101_list_scoped_categories` reemplaza el enum `Category` anterior: siembra los defaults en cada lista existente y remapea el valor de enum que tenía cada artículo a la fila `Category` correspondiente de su propia lista.

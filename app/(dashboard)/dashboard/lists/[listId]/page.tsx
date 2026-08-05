@@ -8,6 +8,7 @@ import { ItemRow } from "@/components/item-row";
 import { CopyLink } from "@/components/copy-link";
 import { DeleteListButton } from "@/components/delete-list-button";
 import { ListAdmins } from "@/components/list-admins";
+import { ListCategories } from "@/components/list-categories";
 import {
   updateList,
   deleteList,
@@ -16,6 +17,9 @@ import {
   deleteItem,
   addListAdmin,
   removeListAdmin,
+  addCategory,
+  renameCategory,
+  deleteCategory,
 } from "../../actions";
 
 export const metadata = { title: "Editar lista — giftlist" };
@@ -32,10 +36,12 @@ export default async function EditListPage({
     where: { id: listId },
     include: {
       admins: { include: { parent: { select: { id: true, name: true, email: true } } } },
+      categories: { orderBy: { position: "asc" } },
       items: {
         orderBy: { position: "asc" },
         include: {
           links: { orderBy: { position: "asc" } },
+          category: { select: { id: true, name: true } },
           reservations: { where: { status: "ACTIVE" }, select: { id: true } },
         },
       },
@@ -104,6 +110,18 @@ export default async function EditListPage({
         />
       </section>
 
+      <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <h2 className="mb-4 text-lg font-semibold text-zinc-900">
+          Categorías ({list.categories.length})
+        </h2>
+        <ListCategories
+          categories={list.categories}
+          addAction={addCategory.bind(null, list.id)}
+          renameAction={renameCategory.bind(null, list.id)}
+          deleteAction={deleteCategory.bind(null, list.id)}
+        />
+      </section>
+
       <section>
         <h2 className="mb-4 text-lg font-semibold text-zinc-900">
           Artículos ({list.items.length})
@@ -128,6 +146,7 @@ export default async function EditListPage({
                   quantityWanted: item.quantityWanted,
                   activeReservations: item.reservations.length,
                 }}
+                categories={list.categories}
                 updateAction={updateItem.bind(null, item.id)}
                 deleteAction={deleteItem.bind(null, item.id)}
               />
@@ -138,6 +157,7 @@ export default async function EditListPage({
           <h3 className="mb-4 font-semibold text-zinc-900">Añadir artículo</h3>
           <ItemForm
             action={addItem.bind(null, list.id)}
+            categories={list.categories}
             submitLabel="Añadir"
             resetOnSuccess
           />

@@ -5,10 +5,10 @@ import { ItemForm } from "@/components/item-form";
 import { PriorityBadge } from "@/components/priority-badge";
 import { CategoryBadge } from "@/components/category-badge";
 import type { FormState } from "@/app/(dashboard)/dashboard/actions";
-import type { ItemCategory } from "@/lib/categories";
 
 export function ItemRow({
   item,
+  categories,
   updateAction,
   deleteAction,
 }: {
@@ -19,10 +19,11 @@ export function ItemRow({
     links: { label: string; url: string }[];
     imageUrl: string | null;
     priority: "LOW" | "MEDIUM" | "HIGH";
-    category: ItemCategory | null;
+    category: { id: string; name: string } | null;
     quantityWanted: number;
     activeReservations: number;
   };
+  categories: { id: string; name: string }[];
   updateAction: (state: FormState, formData: FormData) => Promise<FormState>;
   deleteAction: () => Promise<void>;
 }) {
@@ -33,7 +34,8 @@ export function ItemRow({
       <li className="rounded-xl border border-rose-200 bg-white p-4 shadow-sm">
         <ItemForm
           action={updateAction}
-          defaults={item}
+          defaults={{ ...item, categoryId: item.category?.id ?? null }}
+          categories={categories}
           submitLabel="Guardar cambios"
           onDone={() => setEditing(false)}
         />
