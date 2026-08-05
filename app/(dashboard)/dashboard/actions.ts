@@ -13,6 +13,12 @@ import {
 } from "@/lib/validation";
 import { requireSession, requireOwnedList, requireOwnedItem } from "@/lib/authz";
 import { DEFAULT_CATEGORIES } from "@/lib/categories";
+import { withRetry } from "@/lib/with-retry";
+import { Prisma } from "@/app/generated/prisma/client";
+
+function isDuplicateNameError(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+}
 
 export type FormState = { error?: string } | undefined;
 
@@ -210,9 +216,16 @@ export async function addCategory(
     orderBy: { position: "desc" },
     select: { position: true },
   });
-  await prisma.category.create({
-    data: { listId, name: parsed.data.name, position: (last?.position ?? -1) + 1 },
-  });
+  try {
+    await prisma.category.create({
+      data: { listId, name: parsed.data.name, position: (last?.position ?? -1) + 1 },
+    });
+  } catch (error) {
+    // Two concurrent adds with the same name: the pre-check above raced.
+    // The DB's @@unique([listId, name]) is the real guard.
+    if (isDuplicateNameError(error)) return { error: "Ya existe una categoría con ese nombre." };
+    throw error;
+  }
   revalidatePath(`/dashboard/lists/${listId}`);
   return undefined;
 }
@@ -232,10 +245,15 @@ export async function renameCategory(
   });
   if (existing) return { error: "Ya existe una categoría con ese nombre." };
 
-  await prisma.category.updateMany({
-    where: { id: categoryId, listId },
-    data: { name: parsed.data.name },
-  });
+  try {
+    await prisma.category.updateMany({
+      where: { id: categoryId, listId },
+      data: { name: parsed.data.name },
+    });
+  } catch (error) {
+    if (isDuplicateNameError(error)) return { error: "Ya existe una categoría con ese nombre." };
+    throw error;
+  }
   revalidatePath(`/dashboard/lists/${listId}`);
   return undefined;
 }
@@ -278,10 +296,17 @@ export async function addListAdmin(
 
 export async function removeListAdmin(listId: string, adminId: string): Promise<void> {
   await requireOwnedList(listId);
-  const count = await prisma.giftListAdmin.count({ where: { listId } });
-  if (count <= 1) throw new Error("No se puede quitar al último administrador de la lista.");
-
-  await prisma.giftListAdmin.deleteMany({ where: { id: adminId, listId } });
+  // Count-then-delete inside one transaction: SQLite serializes write
+  // transactions, so two concurrent removals (e.g. the last two admins
+  // removing each other at once) can't both observe count > 1 and both
+  // succeed — the loser retries against the committed state.
+  await withRetry(() =>
+    prisma.$transaction(async (tx) => {
+      const count = await tx.giftListAdmin.count({ where: { listId } });
+      if (count <= 1) throw new Error("No se puede quitar al último administrador de la lista.");
+      await tx.giftListAdmin.deleteMany({ where: { id: adminId, listId } });
+    })
+  );
   revalidatePath(`/dashboard/lists/${listId}`);
 }
 
@@ -289,9 +314,15 @@ export async function cancelReservation(reservationId: string): Promise<void> {
   const session = await requireSession();
   const reservation = await prisma.reservation.findUnique({
     where: { id: reservationId },
-    include: { item: { include: { list: true } } },
+    include: {
+      item: {
+        include: {
+          list: { include: { admins: { where: { parentId: session.user.id } } } },
+        },
+      },
+    },
   });
-  if (!reservation || reservation.item.list.parentId !== session.user.id) {
+  if (!reservation || reservation.item.list.admins.length === 0) {
     throw new Error("No autorizado");
   }
   await prisma.reservation.update({
