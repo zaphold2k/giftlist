@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { ItemForm } from "@/components/item-form";
 import { PriorityBadge } from "@/components/priority-badge";
+import { CategoryBadge } from "@/components/category-badge";
 import type { FormState } from "@/app/(dashboard)/dashboard/actions";
+import type { ItemCategory } from "@/lib/categories";
 
 export function ItemRow({
   item,
@@ -17,6 +19,7 @@ export function ItemRow({
     links: { label: string; url: string }[];
     imageUrl: string | null;
     priority: "LOW" | "MEDIUM" | "HIGH";
+    category: ItemCategory | null;
     quantityWanted: number;
     activeReservations: number;
   };
@@ -44,6 +47,7 @@ export function ItemRow({
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium text-zinc-900">{item.name}</span>
           <PriorityBadge priority={item.priority} />
+          <CategoryBadge category={item.category} />
           {item.quantityWanted > 1 && (
             <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600">
               ×{item.quantityWanted}

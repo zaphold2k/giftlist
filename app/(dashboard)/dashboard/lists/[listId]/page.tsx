@@ -124,6 +124,7 @@ export default async function EditListPage({
                   links: item.links.map((l) => ({ label: l.label ?? "", url: l.url })),
                   imageUrl: item.imageUrl,
                   priority: item.priority,
+                  category: item.category,
                   quantityWanted: item.quantityWanted,
                   activeReservations: item.reservations.length,
                 }}

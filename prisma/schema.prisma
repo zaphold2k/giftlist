@@ -63,6 +63,7 @@ model GiftItem {
   description    String?
   imageUrl       String?
   priority       Priority       @default(MEDIUM)
+  category       Category?
   quantityWanted Int            @default(1)
   position       Int            @default(0)
   links          GiftItemLink[]
@@ -71,6 +72,16 @@ model GiftItem {
   updatedAt      DateTime       @updatedAt
 
   @@index([listId])
+}
+
+enum Category {
+  ROPA
+  JUGUETES
+  HIGIENE
+  ALIMENTACION
+  PASEO
+  HABITACION
+  OTROS
 }
 
 // A store link where the item could be bought. An item can list several,

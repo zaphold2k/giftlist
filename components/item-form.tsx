@@ -2,6 +2,7 @@
 
 import { useActionState, useRef, useState } from "react";
 import type { FormState } from "@/app/(dashboard)/dashboard/actions";
+import { CATEGORIES, CATEGORY_LABELS, type ItemCategory } from "@/lib/categories";
 
 const inputClass =
   "w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-200";
@@ -26,6 +27,7 @@ export function ItemForm({
     links?: Link[];
     imageUrl?: string | null;
     priority?: "LOW" | "MEDIUM" | "HIGH";
+    category?: ItemCategory | null;
     quantityWanted?: number;
   };
   submitLabel: string;
@@ -152,6 +154,23 @@ export function ItemForm({
             <option value="HIGH">Alta — nos hace mucha falta</option>
             <option value="MEDIUM">Media</option>
             <option value="LOW">Baja — sería un detalle</option>
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-zinc-700">
+            Categoría <span className="text-zinc-400">(opcional)</span>
+          </label>
+          <select
+            name="category"
+            defaultValue={defaults?.category ?? ""}
+            className={inputClass}
+          >
+            <option value="">Sin categoría</option>
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {CATEGORY_LABELS[c]}
+              </option>
+            ))}
           </select>
         </div>
         <div>

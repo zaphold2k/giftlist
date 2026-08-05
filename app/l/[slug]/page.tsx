@@ -2,6 +2,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { PriorityBadge } from "@/components/priority-badge";
+import { CategoryBadge } from "@/components/category-badge";
 import { ReservationForm } from "@/components/reservation-form";
 import { reserve } from "./actions";
 
@@ -120,6 +121,7 @@ export default async function PublicListPage({
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="font-semibold text-zinc-900">{item.name}</h2>
                     <PriorityBadge priority={item.priority} />
+                    <CategoryBadge category={item.category} />
                   </div>
                   {item.description && (
                     <p className="mt-1 text-sm text-zinc-600">{item.description}</p>

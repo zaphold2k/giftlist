@@ -23,6 +23,7 @@ function parseItemForm(formData: FormData) {
     description: formData.get("description"),
     imageUrl: formData.get("imageUrl"),
     priority: formData.get("priority") ?? "MEDIUM",
+    category: formData.get("category") ?? "",
     quantityWanted: formData.get("quantityWanted") ?? 1,
   });
 }
@@ -114,6 +115,7 @@ export async function addItem(
       description: parsed.data.description || null,
       imageUrl: parsed.data.imageUrl || null,
       priority: parsed.data.priority,
+      category: parsed.data.category || null,
       quantityWanted: parsed.data.quantityWanted,
       position: (last?.position ?? -1) + 1,
       links: {
@@ -143,6 +145,7 @@ export async function updateItem(
       description: parsed.data.description || null,
       imageUrl: parsed.data.imageUrl || null,
       priority: parsed.data.priority,
+      category: parsed.data.category || null,
       quantityWanted: parsed.data.quantityWanted,
       links: {
         deleteMany: {},

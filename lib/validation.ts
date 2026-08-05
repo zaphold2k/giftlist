@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CATEGORIES } from "@/lib/categories";
 
 export const registerSchema = z.object({
   name: z.string().trim().min(1, "El nombre es obligatorio").max(100),
@@ -22,6 +23,7 @@ export const itemSchema = z.object({
   description: z.string().trim().max(1000).optional().or(z.literal("")),
   imageUrl: z.union([z.url("URL inválida"), z.literal("")]).optional(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH"]).default("MEDIUM"),
+  category: z.enum(CATEGORIES).optional().or(z.literal("")),
   quantityWanted: z.coerce.number().int().min(1).max(99).default(1),
 });
 
