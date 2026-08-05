@@ -7,6 +7,15 @@ import { reserve } from "./actions";
 
 export const dynamic = "force-dynamic";
 
+function linkText(link: { label: string | null; url: string }) {
+  if (link.label) return link.label;
+  try {
+    return new URL(link.url).hostname.replace(/^www\./, "");
+  } catch {
+    return "tienda";
+  }
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -36,6 +45,7 @@ export default async function PublicListPage({
       items: {
         orderBy: [{ priority: "desc" }, { position: "asc" }],
         include: {
+          links: { orderBy: { position: "asc" } },
           reservations: { where: { status: "ACTIVE" }, select: { id: true } },
         },
       },
@@ -114,17 +124,22 @@ export default async function PublicListPage({
                   {item.description && (
                     <p className="mt-1 text-sm text-zinc-600">{item.description}</p>
                   )}
+                  {item.links.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      {item.links.map((link) => (
+                        <a
+                          key={link.id}
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-full border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50"
+                        >
+                          {linkText(link)} ↗
+                        </a>
+                      ))}
+                    </div>
+                  )}
                   <div className="mt-1 flex flex-wrap items-center gap-3 text-sm">
-                    {item.url && (
-                      <a
-                        href={item.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-rose-600 hover:underline"
-                      >
-                        Ver en tienda ↗
-                      </a>
-                    )}
                     {item.quantityWanted > 1 && (
                       <span className="text-zinc-500">
                         {reserved} de {item.quantityWanted} reservados

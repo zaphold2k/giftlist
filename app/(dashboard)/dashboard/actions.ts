@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { generateSlug } from "@/lib/slug";
-import { listSchema, itemSchema, addAdminSchema } from "@/lib/validation";
+import { listSchema, itemSchema, itemLinkSchema, addAdminSchema } from "@/lib/validation";
 import { requireSession, requireOwnedList, requireOwnedItem } from "@/lib/authz";
 
 export type FormState = { error?: string } | undefined;
@@ -21,11 +21,27 @@ function parseItemForm(formData: FormData) {
   return itemSchema.safeParse({
     name: formData.get("name"),
     description: formData.get("description"),
-    url: formData.get("url"),
     imageUrl: formData.get("imageUrl"),
     priority: formData.get("priority") ?? "MEDIUM",
     quantityWanted: formData.get("quantityWanted") ?? 1,
   });
+}
+
+// Store links are submitted as parallel `linkLabel[]` / `linkUrl[]` arrays,
+// one pair per row the user added in the form. Rows left blank are skipped.
+function parseLinksForm(
+  formData: FormData
+): { success: true; links: { label: string | null; url: string }[] } | { success: false; error: string } {
+  const labels = formData.getAll("linkLabel").map(String);
+  const urls = formData.getAll("linkUrl").map(String);
+  const links: { label: string | null; url: string }[] = [];
+  for (let i = 0; i < urls.length; i++) {
+    if (!urls[i].trim()) continue;
+    const parsed = itemLinkSchema.safeParse({ label: labels[i] ?? "", url: urls[i] });
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
+    links.push({ label: parsed.data.label || null, url: parsed.data.url });
+  }
+  return { success: true, links };
 }
 
 export async function createList(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -83,6 +99,8 @@ export async function addItem(
   await requireOwnedList(listId);
   const parsed = parseItemForm(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const parsedLinks = parseLinksForm(formData);
+  if (!parsedLinks.success) return { error: parsedLinks.error };
 
   const last = await prisma.giftItem.findFirst({
     where: { listId },
@@ -94,11 +112,13 @@ export async function addItem(
       listId,
       name: parsed.data.name,
       description: parsed.data.description || null,
-      url: parsed.data.url || null,
       imageUrl: parsed.data.imageUrl || null,
       priority: parsed.data.priority,
       quantityWanted: parsed.data.quantityWanted,
       position: (last?.position ?? -1) + 1,
+      links: {
+        create: parsedLinks.links.map((l, i) => ({ label: l.label, url: l.url, position: i })),
+      },
     },
   });
   revalidatePath(`/dashboard/lists/${listId}`);
@@ -113,16 +133,21 @@ export async function updateItem(
   const item = await requireOwnedItem(itemId);
   const parsed = parseItemForm(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const parsedLinks = parseLinksForm(formData);
+  if (!parsedLinks.success) return { error: parsedLinks.error };
 
   await prisma.giftItem.update({
     where: { id: itemId },
     data: {
       name: parsed.data.name,
       description: parsed.data.description || null,
-      url: parsed.data.url || null,
       imageUrl: parsed.data.imageUrl || null,
       priority: parsed.data.priority,
       quantityWanted: parsed.data.quantityWanted,
+      links: {
+        deleteMany: {},
+        create: parsedLinks.links.map((l, i) => ({ label: l.label, url: l.url, position: i })),
+      },
     },
   });
   revalidatePath(`/dashboard/lists/${item.listId}`);

@@ -35,6 +35,7 @@ export default async function EditListPage({
       items: {
         orderBy: { position: "asc" },
         include: {
+          links: { orderBy: { position: "asc" } },
           reservations: { where: { status: "ACTIVE" }, select: { id: true } },
         },
       },
@@ -120,7 +121,7 @@ export default async function EditListPage({
                   id: item.id,
                   name: item.name,
                   description: item.description,
-                  url: item.url,
+                  links: item.links.map((l) => ({ label: l.label ?? "", url: l.url })),
                   imageUrl: item.imageUrl,
                   priority: item.priority,
                   quantityWanted: item.quantityWanted,

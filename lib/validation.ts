@@ -20,10 +20,14 @@ export const listSchema = z.object({
 export const itemSchema = z.object({
   name: z.string().trim().min(1, "El nombre es obligatorio").max(120),
   description: z.string().trim().max(1000).optional().or(z.literal("")),
-  url: z.union([z.url("URL inválida"), z.literal("")]).optional(),
   imageUrl: z.union([z.url("URL inválida"), z.literal("")]).optional(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH"]).default("MEDIUM"),
   quantityWanted: z.coerce.number().int().min(1).max(99).default(1),
+});
+
+export const itemLinkSchema = z.object({
+  label: z.string().trim().max(60).optional().or(z.literal("")),
+  url: z.url("Enlace inválido"),
 });
 
 export const addAdminSchema = z.object({

@@ -14,7 +14,7 @@ export function ItemRow({
     id: string;
     name: string;
     description: string | null;
-    url: string | null;
+    links: { label: string; url: string }[];
     imageUrl: string | null;
     priority: "LOW" | "MEDIUM" | "HIGH";
     quantityWanted: number;

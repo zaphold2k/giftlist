@@ -56,21 +56,35 @@ model GiftListAdmin {
 }
 
 model GiftItem {
-  id             String        @id @default(cuid())
+  id             String         @id @default(cuid())
   listId         String
-  list           GiftList      @relation(fields: [listId], references: [id], onDelete: Cascade)
+  list           GiftList       @relation(fields: [listId], references: [id], onDelete: Cascade)
   name           String
   description    String?
-  url            String?
   imageUrl       String?
-  priority       Priority      @default(MEDIUM)
-  quantityWanted Int           @default(1)
-  position       Int           @default(0)
+  priority       Priority       @default(MEDIUM)
+  quantityWanted Int            @default(1)
+  position       Int            @default(0)
+  links          GiftItemLink[]
   reservations   Reservation[]
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   @@index([listId])
+}
+
+// A store link where the item could be bought. An item can list several,
+// e.g. to offer guests a choice of store or a size/color variant.
+model GiftItemLink {
+  id        String   @id @default(cuid())
+  itemId    String
+  item      GiftItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  label     String?
+  url       String
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([itemId])
 }
 
 enum Priority {
