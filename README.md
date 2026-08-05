@@ -40,6 +40,15 @@ Prueba de estrés: `npx tsx scripts/test-concurrency.ts` lanza 10 reservas en pa
 
 ## Docker
 
+Con docker compose (recomendado):
+
+```bash
+cp .env.example .env   # completar AUTH_SECRET (openssl rand -base64 32)
+docker compose up -d --build
+```
+
+Manualmente:
+
 ```bash
 docker build -t giftlist .
 docker run -d -p 3000:3000 \
