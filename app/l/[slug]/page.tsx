@@ -1,8 +1,10 @@
 /* eslint-disable @next/next/no-img-element */
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { categorySwatchClasses } from "@/lib/categories";
 import { PriorityBadge } from "@/components/priority-badge";
 import { CategoryBadge } from "@/components/category-badge";
+import { CategoryIndex, categoryAnchorId } from "@/components/category-index";
 import { ReservationForm } from "@/components/reservation-form";
 import { reserve } from "./actions";
 
@@ -47,7 +49,7 @@ export default async function PublicListPage({
         orderBy: [{ priority: "desc" }, { position: "asc" }],
         include: {
           links: { orderBy: { position: "asc" } },
-          category: { select: { id: true, name: true, color: true } },
+          category: { select: { id: true, name: true, color: true, position: true } },
           reservations: { where: { status: "ACTIVE" }, select: { id: true } },
         },
       },
@@ -55,11 +57,33 @@ export default async function PublicListPage({
   });
   if (!list) notFound();
 
-  const priorityOrder = { HIGH: 0, MEDIUM: 1, LOW: 2 } as const;
-  const items = [...list.items].sort(
-    (a, b) =>
-      priorityOrder[a.priority] - priorityOrder[b.priority] || a.position - b.position
-  );
+  const items = list.items;
+
+  // Group by category (position order; uncategorized last), items within a
+  // group ascending by how many units are wanted — the point is guests see
+  // the "just one, easy to fully cover" gifts before big-ticket asks.
+  type Item = (typeof items)[number];
+  type Group = { id: string | null; name: string; color: string | null; position: number; items: Item[] };
+  const groupsByKey = new Map<string, Group>();
+  for (const item of items) {
+    const key = item.category?.id ?? "__none__";
+    let group = groupsByKey.get(key);
+    if (!group) {
+      group = {
+        id: item.category?.id ?? null,
+        name: item.category?.name ?? "Sin categoría",
+        color: item.category?.color ?? null,
+        position: item.category?.position ?? Number.MAX_SAFE_INTEGER,
+        items: [],
+      };
+      groupsByKey.set(key, group);
+    }
+    group.items.push(item);
+  }
+  const groups = [...groupsByKey.values()].sort((a, b) => a.position - b.position);
+  for (const group of groups) {
+    group.items.sort((a, b) => a.quantityWanted - b.quantityWanted || a.position - b.position);
+  }
 
   return (
     <div className="min-h-screen bg-rose-50/40">
@@ -86,7 +110,9 @@ export default async function PublicListPage({
         </div>
       </header>
 
-      <main className="mx-auto max-w-2xl space-y-4 px-4 py-8">
+      <CategoryIndex groups={groups} />
+
+      <main className="mx-auto max-w-2xl space-y-8 px-4 py-8">
         {reservado && items.some((i) => i.id === reservado) && (
           <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center text-sm font-medium text-emerald-700">
             ¡Reservado! Gracias por tu regalo 💝 «
@@ -98,74 +124,90 @@ export default async function PublicListPage({
             Esta lista todavía no tiene artículos.
           </p>
         )}
-        {items.map((item) => {
-          const reserved = item.reservations.length;
-          const remaining = item.quantityWanted - reserved;
-          const fullyReserved = remaining <= 0;
+        {groups.map((group) => (
+          <section
+            key={group.id ?? "sin-categoria"}
+            id={categoryAnchorId(group.id)}
+            className="scroll-mt-6 space-y-4"
+          >
+            <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+              <span
+                className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                  group.color ? categorySwatchClasses(group.color) : "bg-zinc-300"
+                }`}
+              />
+              {group.name}
+            </h2>
+            {group.items.map((item) => {
+              const reserved = item.reservations.length;
+              const remaining = item.quantityWanted - reserved;
+              const fullyReserved = remaining <= 0;
 
-          return (
-            <article
-              key={item.id}
-              className={`rounded-xl border bg-white p-5 shadow-sm ${
-                fullyReserved ? "border-zinc-200 opacity-70" : "border-zinc-200"
-              }`}
-            >
-              <div className="flex gap-4">
-                {item.imageUrl && (
-                  <img
-                    src={item.imageUrl}
-                    alt=""
-                    className="h-20 w-20 shrink-0 rounded-lg border border-zinc-100 object-cover"
-                  />
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="font-semibold text-zinc-900">{item.name}</h2>
-                    <PriorityBadge priority={item.priority} />
-                    <CategoryBadge category={item.category} />
-                  </div>
-                  {item.description && (
-                    <p className="mt-1 text-sm text-zinc-600">{item.description}</p>
-                  )}
-                  {item.links.length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      {item.links.map((link) => (
-                        <a
-                          key={link.id}
-                          href={link.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="rounded-full border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50"
-                        >
-                          {linkText(link)} ↗
-                        </a>
-                      ))}
+              return (
+                <article
+                  key={item.id}
+                  className={`rounded-xl border bg-white p-5 shadow-sm ${
+                    fullyReserved ? "border-zinc-200 opacity-70" : "border-zinc-200"
+                  }`}
+                >
+                  <div className="flex gap-4">
+                    {item.imageUrl && (
+                      <img
+                        src={item.imageUrl}
+                        alt=""
+                        className="h-20 w-20 shrink-0 rounded-lg border border-zinc-100 object-cover"
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-semibold text-zinc-900">{item.name}</h3>
+                        <PriorityBadge priority={item.priority} />
+                        <CategoryBadge category={item.category} />
+                      </div>
+                      {item.description && (
+                        <p className="mt-1 text-sm text-zinc-600">{item.description}</p>
+                      )}
+                      {item.links.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          {item.links.map((link) => (
+                            <a
+                              key={link.id}
+                              href={link.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="rounded-full border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50"
+                            >
+                              {linkText(link)} ↗
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                      <div className="mt-1 flex flex-wrap items-center gap-3 text-sm">
+                        {item.quantityWanted > 1 && (
+                          <span className="text-zinc-500">
+                            {reserved} de {item.quantityWanted} reservados
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  )}
-                  <div className="mt-1 flex flex-wrap items-center gap-3 text-sm">
-                    {item.quantityWanted > 1 && (
-                      <span className="text-zinc-500">
-                        {reserved} de {item.quantityWanted} reservados
-                      </span>
+                  </div>
+                  <div className="mt-4">
+                    {fullyReserved ? (
+                      <p className="rounded-lg bg-zinc-100 px-3 py-2 text-center text-sm font-medium text-zinc-500">
+                        Ya reservado 🎁
+                      </p>
+                    ) : (
+                      <ReservationForm
+                        action={reserve.bind(null, list.slug, item.id)}
+                        remaining={remaining}
+                      />
                     )}
                   </div>
-                </div>
-              </div>
-              <div className="mt-4">
-                {fullyReserved ? (
-                  <p className="rounded-lg bg-zinc-100 px-3 py-2 text-center text-sm font-medium text-zinc-500">
-                    Ya reservado 🎁
-                  </p>
-                ) : (
-                  <ReservationForm
-                    action={reserve.bind(null, list.slug, item.id)}
-                    remaining={remaining}
-                  />
-                )}
-              </div>
-            </article>
-          );
-        })}
+                </article>
+              );
+            })}
+          </section>
+        ))}
       </main>
 
       <footer className="pb-8 text-center text-xs text-zinc-400">

@@ -56,8 +56,18 @@ Un `GiftItem` puede tener una `Category` opcional para clasificarlo. **No es un 
 - `GiftItem.categoryId` es nullable con `onDelete: SetNull` — borrar una categoría nunca borra los artículos, solo los deja sin categoría.
 - El `<select>` de categoría en `components/item-form.tsx` recibe la lista de categorías de la lista actual como prop (`categories`), no una constante global. `resolveCategoryId()` en `app/(dashboard)/dashboard/actions.ts` revalida server-side que el `categoryId` recibido pertenezca a esa lista.
 - Se muestra con `components/category-badge.tsx` (no se renderiza si `category` es `null`) tanto en el dashboard como en la vista pública.
-- No agrupa ni filtra los artículos por categoría todavía, solo los etiqueta.
 - Migración `prisma/migrations/20260805022101_list_scoped_categories` reemplaza el enum `Category` original: siembra los defaults en cada lista existente y remapea el valor de enum que tenía cada artículo a la fila `Category` correspondiente de su propia lista. `prisma/migrations/20260806132554_category_color` agrega la columna `color` (default `"sky"`, sin backfill especial necesario).
+- En el dashboard (`ItemRow`/`ItemForm`) los artículos siguen listados en orden manual (`GiftItem.position`), sin agrupar — es la vista de edición, no la de navegación. El agrupado por categoría es solo para la vista pública, ver abajo.
+
+### Vista pública agrupada por categoría, con índice flotante
+
+La vista pública (`app/l/[slug]/page.tsx`) agrupa los artículos por categoría en vez de listarlos planos.
+
+- Orden de las secciones: por `Category.position` (mismo orden en que aparecen en el panel "Categorías" del dashboard); los artículos sin categoría van en una sección final "Sin categoría". Dentro de cada sección, los artículos van ascendente por `quantityWanted` (cuántas unidades se piden — no por `remaining`, que cambiaría de orden a medida que se reservan cosas), con `position` como desempate estable.
+- El agrupado se arma en el propio Server Component con un `Map` (`groupsByKey` → `groups` ordenado), no hay query adicional: la categoría de cada item ya viaja en el `include` existente.
+- Cada sección es un `<section id={categoryAnchorId(group.id)}>` (helper en `components/category-index.tsx`) — es el ancla que usa el índice.
+- `components/category-index.tsx` (`CategoryIndex`) renderiza un `<nav>` `fixed` a la izquierda con un link por sección (mismo array `groups`, mismo orden). Se oculta si hay 0 o 1 secciones (no tiene sentido "saltar" entre una sola). Es un Server Component — la navegación es con anchors `<a href="#...">` nativos, sin JS ni scrollspy; el smooth scroll es CSS (`scroll-smooth` en el `<html>` de `app/layout.tsx`) + `scroll-mt-6` en cada `<section>`. No resalta la sección visible actualmente (no hay IntersectionObserver) — si se pide eso, es la próxima vuelta natural sobre esto.
+- Solo aparece en pantallas `lg:` en adelante (`hidden lg:flex`) — en mobile no hay lugar al costado del contenido centrado.
 
 ### Prioridad de artículo
 

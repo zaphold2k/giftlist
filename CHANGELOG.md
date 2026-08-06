@@ -8,6 +8,7 @@
 - Enlaces múltiples a tienda por artículo (`GiftItemLink`): cada artículo puede listar varias opciones de compra (distintas tiendas, talles, colores), cada una con un label opcional.
 - `docker-compose.yml` para levantar la app con un solo comando, con `.env.example` como plantilla de variables.
 - Categorías de artículo, editables por lista: cada lista arranca con un set por defecto (Ropa, Juguetes, Higiene y cuidado, Alimentación, Paseo, Habitación, Otros) que sus administradores pueden renombrar, agregar o borrar libremente, sin afectar a otras listas. Cada categoría tiene un color elegible de una paleta curada de 8 opciones.
+- La vista pública de la lista ahora agrupa los regalos por categoría (orden ascendente por cantidad de unidades pedidas dentro de cada una), con un índice flotante a la izquierda para saltar entre categorías.
 
 ### Cambiado
 
