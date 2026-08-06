@@ -66,31 +66,33 @@ function CategoryRow({
   if (editing) {
     return (
       <li className="space-y-2 py-2">
-        <form action={formAction} className="flex items-center gap-2">
-          <input
-            name="name"
-            type="text"
-            required
-            defaultValue={category.name}
-            autoFocus
-            className="flex-1 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-900 shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-200"
-          />
-          <button
-            type="submit"
-            disabled={pending}
-            className="shrink-0 rounded-lg bg-rose-500 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:opacity-50"
-          >
-            Guardar
-          </button>
-          <button
-            type="button"
-            onClick={() => setEditing(false)}
-            className="shrink-0 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 transition hover:bg-zinc-50"
-          >
-            Cancelar
-          </button>
+        <form action={formAction} className="space-y-2">
+          <div className="flex items-center gap-2">
+            <input
+              name="name"
+              type="text"
+              required
+              defaultValue={category.name}
+              autoFocus
+              className="flex-1 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-900 shadow-sm focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-200"
+            />
+            <button
+              type="submit"
+              disabled={pending}
+              className="shrink-0 rounded-lg bg-rose-500 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:opacity-50"
+            >
+              Guardar
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="shrink-0 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 transition hover:bg-zinc-50"
+            >
+              Cancelar
+            </button>
+          </div>
+          <ColorSwatches value={color} onChange={setColor} />
         </form>
-        <ColorSwatches value={color} onChange={setColor} />
         {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
       </li>
     );
