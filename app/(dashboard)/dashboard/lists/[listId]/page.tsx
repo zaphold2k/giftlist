@@ -67,9 +67,11 @@ export default async function EditListPage({
           <CopyLink path={`/l/${list.slug}`} />
           <Link
             href={`/l/${list.slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
             className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 transition hover:bg-zinc-50"
           >
-            Ver como invitado
+            Ver como invitado ↗
           </Link>
           <Link
             href={`/dashboard/lists/${list.id}/reservations`}
