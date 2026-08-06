@@ -21,7 +21,7 @@ async function main() {
         parentId: parent.id,
         admins: { create: { parentId: parent.id } },
         categories: {
-          create: DEFAULT_CATEGORIES.map((name, i) => ({ name, position: i })),
+          create: DEFAULT_CATEGORIES.map((c, i) => ({ name: c.name, color: c.color, position: i })),
         },
         items: {
           create: [

@@ -19,7 +19,7 @@ export function ItemRow({
     links: { label: string; url: string }[];
     imageUrl: string | null;
     priority: "LOW" | "MEDIUM" | "HIGH";
-    category: { id: string; name: string } | null;
+    category: { id: string; name: string; color: string } | null;
     quantityWanted: number;
     activeReservations: number;
   };

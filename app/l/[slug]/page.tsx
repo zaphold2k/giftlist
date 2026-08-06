@@ -47,7 +47,7 @@ export default async function PublicListPage({
         orderBy: [{ priority: "desc" }, { position: "asc" }],
         include: {
           links: { orderBy: { position: "asc" } },
-          category: { select: { id: true, name: true } },
+          category: { select: { id: true, name: true, color: true } },
           reservations: { where: { status: "ACTIVE" }, select: { id: true } },
         },
       },

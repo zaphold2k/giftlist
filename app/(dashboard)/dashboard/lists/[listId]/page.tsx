@@ -18,7 +18,7 @@ import {
   addListAdmin,
   removeListAdmin,
   addCategory,
-  renameCategory,
+  updateCategory,
   deleteCategory,
 } from "../../actions";
 
@@ -41,7 +41,7 @@ export default async function EditListPage({
         orderBy: { position: "asc" },
         include: {
           links: { orderBy: { position: "asc" } },
-          category: { select: { id: true, name: true } },
+          category: { select: { id: true, name: true, color: true } },
           reservations: { where: { status: "ACTIVE" }, select: { id: true } },
         },
       },
@@ -117,7 +117,7 @@ export default async function EditListPage({
         <ListCategories
           categories={list.categories}
           addAction={addCategory.bind(null, list.id)}
-          renameAction={renameCategory.bind(null, list.id)}
+          updateAction={updateCategory.bind(null, list.id)}
           deleteAction={deleteCategory.bind(null, list.id)}
         />
       </section>

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CATEGORY_COLORS, DEFAULT_CATEGORY_COLOR } from "@/lib/categories";
 
 export const registerSchema = z.object({
   name: z.string().trim().min(1, "El nombre es obligatorio").max(100),
@@ -36,6 +37,7 @@ export const addAdminSchema = z.object({
 
 export const categorySchema = z.object({
   name: z.string().trim().min(1, "El nombre es obligatorio").max(40),
+  color: z.enum(CATEGORY_COLORS).default(DEFAULT_CATEGORY_COLOR),
 });
 
 export const reservationSchema = z.object({

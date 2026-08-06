@@ -86,7 +86,7 @@ export async function createList(_prev: FormState, formData: FormData): Promise<
       parentId: session.user.id,
       admins: { create: { parentId: session.user.id } },
       categories: {
-        create: DEFAULT_CATEGORIES.map((name, i) => ({ name, position: i })),
+        create: DEFAULT_CATEGORIES.map((c, i) => ({ name: c.name, color: c.color, position: i })),
       },
     },
   });
@@ -203,7 +203,10 @@ export async function addCategory(
   formData: FormData
 ): Promise<FormState> {
   await requireOwnedList(listId);
-  const parsed = categorySchema.safeParse({ name: formData.get("name") });
+  const parsed = categorySchema.safeParse({
+    name: formData.get("name"),
+    color: formData.get("color") || undefined,
+  });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const existing = await prisma.category.findFirst({
@@ -218,7 +221,12 @@ export async function addCategory(
   });
   try {
     await prisma.category.create({
-      data: { listId, name: parsed.data.name, position: (last?.position ?? -1) + 1 },
+      data: {
+        listId,
+        name: parsed.data.name,
+        color: parsed.data.color,
+        position: (last?.position ?? -1) + 1,
+      },
     });
   } catch (error) {
     // Two concurrent adds with the same name: the pre-check above raced.
@@ -230,14 +238,17 @@ export async function addCategory(
   return undefined;
 }
 
-export async function renameCategory(
+export async function updateCategory(
   listId: string,
   categoryId: string,
   _prev: FormState,
   formData: FormData
 ): Promise<FormState> {
   await requireOwnedList(listId);
-  const parsed = categorySchema.safeParse({ name: formData.get("name") });
+  const parsed = categorySchema.safeParse({
+    name: formData.get("name"),
+    color: formData.get("color") || undefined,
+  });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const existing = await prisma.category.findFirst({
@@ -248,7 +259,7 @@ export async function renameCategory(
   try {
     await prisma.category.updateMany({
       where: { id: categoryId, listId },
-      data: { name: parsed.data.name },
+      data: { name: parsed.data.name, color: parsed.data.color },
     });
   } catch (error) {
     if (isDuplicateNameError(error)) return { error: "Ya existe una categoría con ese nombre." };
