@@ -2,6 +2,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { categorySwatchClassesOrNeutral } from "@/lib/categories";
+import { isTurnstileConfigured } from "@/lib/turnstile";
 import { PriorityBadge } from "@/components/priority-badge";
 import { CategoryBadge } from "@/components/category-badge";
 import { CategoryIndex, categoryAnchorId } from "@/components/category-index";
@@ -58,6 +59,13 @@ export default async function PublicListPage({
     },
   });
   if (!list) notFound();
+
+  // Same gate the server uses to require a token (isTurnstileConfigured()
+  // checks TURNSTILE_SECRET_KEY) — showing the widget without the server
+  // enforcing it, or vice versa, would be pointless.
+  const turnstileSiteKey = isTurnstileConfigured()
+    ? process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+    : undefined;
 
   const items = list.items;
 
@@ -203,6 +211,7 @@ export default async function PublicListPage({
                       <ReservationForm
                         action={reserve.bind(null, list.slug, item.id)}
                         remaining={remaining}
+                        turnstileSiteKey={turnstileSiteKey}
                       />
                     )}
                   </div>

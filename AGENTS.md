@@ -77,6 +77,17 @@ La vista pública (`app/l/[slug]/page.tsx`) agrupa los artículos por categoría
 
 `docker-compose.yml` envuelve el `Dockerfile` existente (single-container, SQLite en un volumen `/data`, `.env.example` como plantilla). Detalle completo en `README.md`. El `Dockerfile` necesita `python3 make g++` en los stages `deps`/`proddeps` — `node:22-alpine` no los trae y `better-sqlite3` los necesita para compilar su binding nativo en `npm ci`.
 
+### Verificación anti-bot en reservas (Cloudflare Turnstile)
+
+El form de reserva pública (`components/reservation-form.tsx`) puede pedir un challenge de [Turnstile](https://developers.cloudflare.com/turnstile/) antes de dejar reservar — pensado para el caso "alguien con el link del slug scriptea reservas en loop", no bots genéricos rastreando la web (el slug ya los bloquea).
+
+- **Opt-in por env var, no una feature siempre-on**: todo se gatea en `isTurnstileConfigured()` (`lib/turnstile.ts`), que solo chequea `TURNSTILE_SECRET_KEY`. Sin esa var (caso típico de dev local sin cuenta de Cloudflare), no se manda `siteKey` a `ReservationForm` → no se renderiza el widget → `reserve()` en `app/l/[slug]/actions.ts` tampoco exige token. La app funciona exactamente igual que antes de esta feature si no está configurada.
+- `verifyTurnstile()` (`lib/turnstile.ts`) es la **primera llamada de red saliente del proyecto** (`fetch` a `challenges.cloudflare.com/turnstile/v0/siteverify`). Sigue el mismo patrón que `ReservationFullError` en `lib/reservations.ts`: una excepción de dominio (`TurnstileError`) que la server action atrapa con `instanceof` para devolver el `{ error }` amigable de siempre, en vez de dejar que explote.
+- Librería `@marsidev/react-turnstile` (primera dependencia no-esencial del proyecto) — maneja carga del script y render/cleanup del widget; hay potencialmente varios `<ReservationForm>` en la misma página (uno por artículo), la librería soporta eso de forma segura.
+- **El token es de un solo uso.** Si la reserva falla por cualquier motivo (token inválido, o incluso un `ReservationFullError` sin relación con Turnstile), hay que resetear el widget (`turnstileRef.current?.reset()`, ya implementado vía `useEffect` sobre `state?.error`) antes de que el usuario reintente — si no, el segundo intento manda el mismo token ya consumido y Cloudflare lo rechaza sin importar que ahora sí sea válido.
+- La IP real del guest para `verifyTurnstile(token, remoteIp)` sale del header `cf-connecting-ip` (vía `headers()` de `next/headers`) — lo inyecta Cloudflare, no `x-forwarded-for` (que un cliente podría falsear si el request no pasa por Cloudflare).
+- Test keys públicas de Cloudflare para desarrollo local (siempre aprueban/rechazan, sin crear un widget real) documentadas en `.env.example`.
+
 ### Modo claro forzado
 
 `app/globals.css` declara `color-scheme: light` explícito en `:root`. Ningún componente de la app soporta modo oscuro (todos usan colores Tailwind hardcodeados asumiendo fondo claro), así que sin esa declaración Chrome aplica su oscurecimiento automático cuando el sistema está en modo oscuro, generando bajo contraste. Si en algún momento se agrega modo oscuro de verdad, hay que revisar todos los componentes (no solo quitar esta línea).

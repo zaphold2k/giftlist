@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { reserveItem, ReservationFullError } from "@/lib/reservations";
+import { isTurnstileConfigured, verifyTurnstile, TurnstileError } from "@/lib/turnstile";
 import { reservationSchema } from "@/lib/validation";
 
 export type ReserveState = { error?: string } | undefined;
@@ -28,6 +30,16 @@ export async function reserve(
     select: { list: { select: { slug: true } } },
   });
   if (!item || item.list.slug !== slug) return { error: "El artículo no existe" };
+
+  if (isTurnstileConfigured()) {
+    try {
+      const remoteIp = (await headers()).get("cf-connecting-ip") ?? undefined;
+      await verifyTurnstile(String(formData.get("cf-turnstile-response") ?? ""), remoteIp);
+    } catch (error) {
+      if (error instanceof TurnstileError) return { error: error.message };
+      throw error;
+    }
+  }
 
   try {
     await reserveItem({

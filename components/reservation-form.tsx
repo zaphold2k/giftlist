@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import type { ReserveState } from "@/app/l/[slug]/actions";
 
 const inputClass =
@@ -9,12 +10,25 @@ const inputClass =
 export function ReservationForm({
   action,
   remaining,
+  turnstileSiteKey,
 }: {
   action: (state: ReserveState, formData: FormData) => Promise<ReserveState>;
   remaining: number;
+  // Undefined when Turnstile isn't configured server-side — see
+  // isTurnstileConfigured() in lib/turnstile.ts. No widget, no token
+  // required, same as before this feature existed.
+  turnstileSiteKey?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(action, undefined);
+  const turnstileRef = useRef<TurnstileInstance>(undefined);
+
+  // A Turnstile token is single-use: whatever failed (bad token, item just
+  // got fully reserved, etc.), a retry needs a fresh one or Cloudflare
+  // rejects it as already-consumed.
+  useEffect(() => {
+    if (state?.error) turnstileRef.current?.reset();
+  }, [state?.error]);
 
   if (!open) {
     return (
@@ -58,6 +72,7 @@ export function ReservationForm({
         </label>
         <input name="message" type="text" className={inputClass} />
       </div>
+      {turnstileSiteKey && <Turnstile ref={turnstileRef} siteKey={turnstileSiteKey} />}
       {state?.error && (
         <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
           {state.error}
