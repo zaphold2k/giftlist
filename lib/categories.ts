@@ -29,7 +29,7 @@ const CATEGORY_COLOR_BADGE_CLASSES: Record<CategoryColor, string> = {
   zinc: "bg-zinc-100 text-zinc-700",
 };
 
-export const CATEGORY_COLOR_SWATCH_CLASSES: Record<CategoryColor, string> = {
+const CATEGORY_COLOR_SWATCH_CLASSES: Record<CategoryColor, string> = {
   rose: "bg-rose-400",
   orange: "bg-orange-400",
   amber: "bg-amber-400",
@@ -46,13 +46,26 @@ function isCategoryColor(value: string): value is CategoryColor {
 
 // Category.color is a free-text column, not a DB-level enum, so a value that
 // predates a palette change (or was tampered with) needs a safe fallback
-// rather than an undefined lookup.
+// rather than an undefined lookup. Shared by every place that needs a
+// "guaranteed valid" CategoryColor from a raw stored/submitted string —
+// don't reimplement the CATEGORY_COLORS.includes check elsewhere.
+export function toCategoryColor(color: string): CategoryColor {
+  return isCategoryColor(color) ? color : DEFAULT_CATEGORY_COLOR;
+}
+
 export function categoryBadgeClasses(color: string): string {
-  return CATEGORY_COLOR_BADGE_CLASSES[isCategoryColor(color) ? color : DEFAULT_CATEGORY_COLOR];
+  return CATEGORY_COLOR_BADGE_CLASSES[toCategoryColor(color)];
 }
 
 export function categorySwatchClasses(color: string): string {
-  return CATEGORY_COLOR_SWATCH_CLASSES[isCategoryColor(color) ? color : DEFAULT_CATEGORY_COLOR];
+  return CATEGORY_COLOR_SWATCH_CLASSES[toCategoryColor(color)];
+}
+
+// For "uncategorized" spots (no Category at all, color is null) rather than
+// a mis-stored color string — a neutral gray, not silently DEFAULT_CATEGORY_COLOR,
+// so "no category" stays visually distinct from a real category colored sky.
+export function categorySwatchClassesOrNeutral(color: string | null): string {
+  return color ? categorySwatchClasses(color) : "bg-zinc-300";
 }
 
 // Seeded onto every new list (see createList in the dashboard actions) —

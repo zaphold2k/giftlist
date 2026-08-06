@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { categorySwatchClasses } from "@/lib/categories";
+import { categorySwatchClassesOrNeutral } from "@/lib/categories";
 import { PriorityBadge } from "@/components/priority-badge";
 import { CategoryBadge } from "@/components/category-badge";
 import { CategoryIndex, categoryAnchorId } from "@/components/category-index";
@@ -46,7 +46,9 @@ export default async function PublicListPage({
     include: {
       parent: { select: { name: true } },
       items: {
-        orderBy: [{ priority: "desc" }, { position: "asc" }],
+        // No orderBy here: items get regrouped by category and explicitly
+        // re-sorted below, so any DB-level order would be immediately
+        // discarded — don't add one back without removing that grouping.
         include: {
           links: { orderBy: { position: "asc" } },
           category: { select: { id: true, name: true, color: true, position: true } },
@@ -62,6 +64,9 @@ export default async function PublicListPage({
   // Group by category (position order; uncategorized last), items within a
   // group ascending by how many units are wanted — the point is guests see
   // the "just one, easy to fully cover" gifts before big-ticket asks.
+  // Deliberate: priority no longer drives order here (it did before this
+  // grouping existed) — PriorityBadge is still shown, it just isn't a sort
+  // key anymore.
   type Item = (typeof items)[number];
   type Group = { id: string | null; name: string; color: string | null; position: number; items: Item[] };
   const groupsByKey = new Map<string, Group>();
@@ -132,9 +137,7 @@ export default async function PublicListPage({
           >
             <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">
               <span
-                className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                  group.color ? categorySwatchClasses(group.color) : "bg-zinc-300"
-                }`}
+                className={`h-2.5 w-2.5 shrink-0 rounded-full ${categorySwatchClassesOrNeutral(group.color)}`}
               />
               {group.name}
             </h2>

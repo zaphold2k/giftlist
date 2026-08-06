@@ -1,4 +1,4 @@
-import { categorySwatchClasses } from "@/lib/categories";
+import { categorySwatchClassesOrNeutral } from "@/lib/categories";
 
 export function categoryAnchorId(categoryId: string | null) {
   return `categoria-${categoryId ?? "sin-categoria"}`;
@@ -30,9 +30,7 @@ export function CategoryIndex({
           className="flex items-center gap-2 truncate rounded-lg px-2 py-1 font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900"
         >
           <span
-            className={`h-2 w-2 shrink-0 rounded-full ${
-              group.color ? categorySwatchClasses(group.color) : "bg-zinc-300"
-            }`}
+            className={`h-2 w-2 shrink-0 rounded-full ${categorySwatchClassesOrNeutral(group.color)}`}
           />
           <span className="truncate">{group.name}</span>
         </a>

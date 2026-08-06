@@ -1,11 +1,12 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import type { FormState } from "@/app/(dashboard)/dashboard/actions";
 import {
   CATEGORY_COLORS,
   DEFAULT_CATEGORY_COLOR,
   categorySwatchClasses,
+  toCategoryColor,
   type CategoryColor,
 } from "@/lib/categories";
 
@@ -37,12 +38,6 @@ function ColorSwatches({
   );
 }
 
-function asCategoryColor(color: string): CategoryColor {
-  return (CATEGORY_COLORS as readonly string[]).includes(color)
-    ? (color as CategoryColor)
-    : DEFAULT_CATEGORY_COLOR;
-}
-
 function CategoryRow({
   category,
   updateAction,
@@ -53,7 +48,7 @@ function CategoryRow({
   removeAction: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
-  const [color, setColor] = useState<CategoryColor>(() => asCategoryColor(category.color));
+  const [color, setColor] = useState<CategoryColor>(() => toCategoryColor(category.color));
   const [state, formAction, pending] = useActionState(
     async (prev: FormState, formData: FormData) => {
       const result = await updateAction(prev, formData);
@@ -106,7 +101,13 @@ function CategoryRow({
       </span>
       <div className="flex shrink-0 gap-2">
         <button
-          onClick={() => setEditing(true)}
+          onClick={() => {
+            // Re-derive from the current category on every open, not just at
+            // mount — otherwise a discarded pick from a cancelled edit (or a
+            // stale coercion) lingers in state and gets resubmitted next time.
+            setColor(toCategoryColor(category.color));
+            setEditing(true);
+          }}
           className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 transition hover:bg-zinc-50"
         >
           Editar
@@ -145,11 +146,15 @@ export function ListCategories({
   updateAction: (categoryId: string, state: FormState, formData: FormData) => Promise<FormState>;
   deleteAction: (categoryId: string) => Promise<void>;
 }) {
+  const formRef = useRef<HTMLFormElement>(null);
   const [newColor, setNewColor] = useState<CategoryColor>(DEFAULT_CATEGORY_COLOR);
   const [state, formAction, pending] = useActionState(
     async (prev: FormState, formData: FormData) => {
       const result = await addAction(prev, formData);
-      if (!result?.error) setNewColor(DEFAULT_CATEGORY_COLOR);
+      if (!result?.error) {
+        formRef.current?.reset();
+        setNewColor(DEFAULT_CATEGORY_COLOR);
+      }
       return result;
     },
     undefined
@@ -170,7 +175,7 @@ export function ListCategories({
         </ul>
       )}
 
-      <form action={formAction} className="space-y-2">
+      <form ref={formRef} action={formAction} className="space-y-2">
         <div className="flex items-start gap-2">
           <div className="flex-1">
             <input

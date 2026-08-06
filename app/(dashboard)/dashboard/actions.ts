@@ -209,16 +209,16 @@ export async function addCategory(
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const existing = await prisma.category.findFirst({
-    where: { listId, name: parsed.data.name },
-  });
+  const [existing, last] = await Promise.all([
+    prisma.category.findFirst({ where: { listId, name: parsed.data.name } }),
+    prisma.category.findFirst({
+      where: { listId },
+      orderBy: { position: "desc" },
+      select: { position: true },
+    }),
+  ]);
   if (existing) return { error: "Ya existe una categoría con ese nombre." };
 
-  const last = await prisma.category.findFirst({
-    where: { listId },
-    orderBy: { position: "desc" },
-    select: { position: true },
-  });
   try {
     await prisma.category.create({
       data: {
