@@ -209,15 +209,21 @@ npm run build
 
 ## 13. Verification
 
-There is no automated test suite. "It compiles" is not verification.
+"It compiles" is not verification.
 
-- `npx tsc --noEmit`, `npm run lint` and `npm run build` are the minimum
-  bar, not the finish line.
-- Behavior changes are verified against the running app — real login, real
-  click-through, screenshot, console errors — with ad-hoc Playwright
-  scripts kept in the scratchpad, not committed.
-- Concurrency-sensitive changes are exercised under actual concurrency (see
-  `scripts/test-concurrency.ts`).
+- `npx tsc --noEmit`, `npm run lint`, `npm run build` and `npm run
+  test:coverage` are the minimum bar, not the finish line. All four run in
+  CI (`verify` and `test` jobs — see `ROADMAP.md`).
+- Unit/integration tests live in `tests/`, mirroring `lib/` (e.g.
+  `tests/lib/reservations.test.ts`), and run against a disposable SQLite in
+  `os.tmpdir()` (`tests/helpers/db.ts`) — never against `dev.db`.
+  Concurrency-sensitive changes get a real parallel test, not just a
+  sequential one (see `tests/lib/reservations.test.ts`).
+- Behavior changes that touch UI or full request flows are additionally
+  verified against the running app — real login, real click-through,
+  screenshot, console errors — with ad-hoc Playwright scripts kept in the
+  scratchpad, not committed. Automated tests do not replace this for
+  UI-facing changes.
 - Kill dev servers by explicit PID (`ps aux | grep "next dev"`); a zombie
   dev server keeps serving from its own `dev.db` file descriptor and
   produces phantom results.
@@ -231,11 +237,13 @@ There is no automated test suite. "It compiles" is not verification.
   Types in use: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`,
   `ci`, `chore`. A breaking change is marked with `!` after the type
   (`feat!:`) and explained in the body.
-  This is not cosmetic: the release tooling derives the semver bump and the
-  changelog entry from these types — see `ROADMAP.md`.
+  This is not cosmetic: `release-please` derives the semver bump and the
+  `CHANGELOG.md` entry directly from these types — see `ROADMAP.md`.
 - The body explains *why* whenever the diff doesn't make it obvious.
-- **`AGENTS.md` and `CHANGELOG.md` are updated in the same commit as the
-  feature they describe**, not as a cleanup pass afterwards.
+- **`AGENTS.md` is updated in the same commit as the feature it describes**,
+  not as a cleanup pass afterwards. **`CHANGELOG.md` is never edited by
+  hand** — `release-please` generates it from commit messages on the release
+  PR; a manual edit conflicts with that PR.
 - Never commit generated or local artifacts: `dev.db*`, `.env`,
   `*.tsbuildinfo`, `.next/`, `app/generated/prisma`. They are covered by
   `.gitignore` — keep it that way.

@@ -21,11 +21,22 @@ Variables en `.env` (no se versiona): `DATABASE_URL="file:./dev.db"`, `AUTH_SECR
 
 Datos de prueba: `npx tsx prisma/seed.ts` (crea `test@example.com` / `supersecreta1` con una lista de ejemplo).
 
+## Tests
+
+```bash
+npm test              # corre la suite una vez
+npm run test:watch    # modo watch
+npm run test:coverage # con reporte de coverage (coverage/)
+```
+
+Vitest corre contra una SQLite descartable en `os.tmpdir()` (ver `tests/helpers/db.ts`), nunca contra `dev.db`. Cubre `lib/` — autorización, condiciones de carrera en reservas, retries, validación, categorías y Turnstile.
+
 ## Rutas
 
 - `/` landing · `/login` · `/register`
 - `/dashboard` gestión de listas del padre (protegido por sesión vía `proxy.ts`)
 - `/l/[slug]` vista pública de una lista: el slug es un token aleatorio no adivinable y actúa como control de acceso; los invitados reservan sin cuenta
+- `/api/health` chequeo de salud (conectividad a la base) para el `healthcheck` de Docker y herramientas de deploy
 
 ## Concurrencia en reservas
 
@@ -36,7 +47,7 @@ Dos invitados no pueden reservar la misma unidad de un artículo:
 3. Los conflictos de escritura se reintentan con backoff (`lib/with-retry.ts`).
 4. Red de seguridad a nivel de base de datos: índice único parcial sobre `(itemId, unitSlot) WHERE status = 'ACTIVE'` (migración manual), que convierte cualquier doble reserva en una violación de constraint.
 
-Prueba de estrés: `npx tsx scripts/test-concurrency.ts` lanza 10 reservas en paralelo por artículo y verifica que solo triunfan las unidades disponibles.
+Prueba de estrés: `npm test -- tests/lib/reservations.test.ts` lanza 10 reservas en paralelo por artículo y verifica que solo triunfan las unidades disponibles.
 
 ## Anti-bot (Turnstile)
 

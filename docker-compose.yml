@@ -9,6 +9,12 @@ services:
     volumes:
       - giftlist_data:/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 volumes:
   giftlist_data:

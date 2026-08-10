@@ -4,15 +4,15 @@ Plan por fases para llegar a un pipeline que verifique tests y coverage en cada
 PR, publique imágenes taggeadas por branch, y genere un release al mergear a
 `main`.
 
-**Estado actual**: no hay CI. No existe `.github/`, la verificación es manual
-(`tsc`, `eslint`, `next build`, scripts Playwright ad-hoc — ver `AGENTS.md`), y
-la imagen se construye a mano vía `docker-compose.yml`. **No hay tests ni test
-runner**: `package.json` solo define `dev`/`build`/`start`/`lint`, y la única
-prueba real es `scripts/test-concurrency.ts`, un script manual que corre contra
-`dev.db` y borra datos al terminar.
+**Estado actual: las 5 fases están implementadas.** `.github/workflows/ci.yml`
+corre los jobs `verify`, `test`, `migrations` y `docker` en cada PR y push;
+`.github/workflows/release.yml` (release-please) genera el release al mergear
+a `main`. Este documento queda como referencia de las decisiones tomadas y
+las trampas del repo — no como un plan pendiente. El backlog de la Fase 5
+(E2E Playwright, `arm64`) sigue sin implementar a propósito, ver esa sección.
 
-Por eso las fases van en este orden: un gate de coverage sobre 0% no significa
-nada, así que primero hay que fundar la base de tests.
+Las fases se ejecutaron en este orden porque un gate de coverage sobre 0% no
+significa nada: primero había que fundar la base de tests.
 
 ## Decisiones
 
@@ -117,9 +117,11 @@ retroceder, y sube solo a medida que se escriben tests.
   `functions` o `branches` caen más de **0.5 puntos porcentuales**. Sin baseline
   (primera corrida) pasa e informa. La tolerancia evita falsos rojos por
   redondeo.
-- Comentario sticky en el PR con la tabla comparativa (`gh pr comment` con un
-  marcador HTML para editar el mismo comentario en cada push, en vez de
-  acumular ruido).
+- Comentario sticky en el PR con la tabla comparativa: `gh api` sobre
+  `issues/{pr}/comments` buscando un marcador HTML (`<!-- coverage-ratchet -->`)
+  para editar el mismo comentario en cada push (`PATCH`) en vez de crear uno
+  nuevo (`POST`) y acumular ruido. `gh pr comment --edit-last` no sirve acá:
+  edita el último comentario propio sin importar si es el de coverage.
 - Permisos del job: `pull-requests: write`, `actions: read`.
 - `.dockerignore` ya excluye `scripts/`, así que el script no entra en la imagen.
 
@@ -129,7 +131,15 @@ retroceder, y sube solo a medida que se escriben tests.
 
 ## Fase 3 — Build y tags de imagen por branch
 
-**Crear** `.github/workflows/docker.yml`, con `needs: [verify, test]`:
+> **Nota de implementación**: `needs` de GitHub Actions solo puede referenciar
+> jobs del mismo archivo de workflow — no existe forma de que un
+> `docker.yml` separado dependa de `verify`/`test` de `ci.yml`. Por eso el
+> job de Docker vive como un tercer job **dentro de `ci.yml`**, no en un
+> archivo aparte. `workflow_run` es la alternativa estándar para encadenar
+> workflows separados, pero pierde el contexto directo de PR/branch que
+> `metadata-action` necesita para taggear — no vale la complejidad acá.
+
+**Agregar** el job `docker` a `.github/workflows/ci.yml`, con `needs: [verify, test]`:
 
 - `docker/setup-buildx-action` → `docker/login-action` (GHCR, `GITHUB_TOKEN`) →
   `docker/metadata-action` → `docker/build-push-action`.
@@ -144,8 +154,8 @@ retroceder, y sube solo a medida que se escriben tests.
 - Solo `linux/amd64`. `arm64` queda pendiente: exige QEMU y compilar
   `better-sqlite3` emulado, lo que multiplica el tiempo de build. Se agrega
   recién si hay un target ARM real.
-- **Smoke test** post-build: `docker run` con `AUTH_SECRET` dummy y un volumen
-  temporal; esperar 200 en `/`. Valida lo que un `docker build` no valida: que
+- **Smoke test** post-build: `docker run` con `AUTH_SECRET` dummy; esperar 200
+  en `/api/health` (Fase 5). Valida lo que un `docker build` no valida: que
   `docker-entrypoint.sh` corra `migrate deploy` sobre una base vacía y que el
   bundle standalone arranque.
 
@@ -189,14 +199,20 @@ ese PR publica `ghcr.io/zaphold2k/giftlist:X.Y.Z` y `:latest`.
 
 ## Fase 5 — Backlog priorizado
 
-- **Job `migrations`**: `prisma migrate deploy` sobre base vacía +
+Implementado:
+
+- **Job `migrations`** (`ci.yml`): `prisma migrate deploy` sobre base vacía +
   `prisma migrate diff --exit-code` contra `schema.prisma`, para detectar
   migración faltante o backfill roto. Alto valor acá porque varias migraciones
   están editadas a mano (`list_scoped_categories`, `item_links`).
-- **Endpoint `/api/health`**: reemplaza el `curl /` del smoke test y habilita
-  healthchecks de deploy.
-- **E2E Playwright** contra la imagen publicada. Diferido a propósito: suma
-  minutos por PR y mantenimiento de selectores — `AGENTS.md` ya documenta que
-  los locators por texto se rompen cuando un componente entra en modo edición.
-- **Dependabot** para npm y para las GitHub Actions.
+- **Endpoint `/api/health`** (`app/api/health/route.ts`): reemplaza el
+  `curl /` del smoke test y habilita el `healthcheck` de `docker-compose.yml`.
+- **Dependabot** (`.github/dependabot.yml`) para npm y para las GitHub
+  Actions, semanal.
+
+Pendiente, diferido a propósito:
+
+- **E2E Playwright** contra la imagen publicada. Suma minutos por PR y
+  mantenimiento de selectores — `AGENTS.md` ya documenta que los locators por
+  texto se rompen cuando un componente entra en modo edición.
 - **`arm64`** si aparece un target de deploy ARM.
