@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.env
+.env.*
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+data
+dev.db
+scripts
+README.md
+AGENTS.md
+CLAUDE.md
+Dockerfile
+.dockerignore

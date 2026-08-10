@@ -1,0 +1,14 @@
+services:
+  app:
+    build:
+      context: .
+    ports:
+      - "3000:3000"
+    environment:
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET es obligatorio, definilo en .env}
+    volumes:
+      - giftlist_data:/data
+    restart: unless-stopped
+
+volumes:
+  giftlist_data:

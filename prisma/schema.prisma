@@ -1,0 +1,143 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Parent {
+  id             String          @id @default(cuid())
+  email          String          @unique
+  passwordHash   String
+  name           String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  createdLists   GiftList[]      @relation("ListCreator")
+  listAdminships GiftListAdmin[]
+}
+
+model GiftList {
+  id          String          @id @default(cuid())
+  slug        String          @unique
+  title       String
+  description String?
+  eventDate   DateTime?
+  // Original creator, kept for provenance. Access control goes through
+  // `admins` — see GiftListAdmin — not this field, since a list can have
+  // multiple registered administrators with equal rights.
+  parentId    String
+  parent      Parent          @relation("ListCreator", fields: [parentId], references: [id], onDelete: Cascade)
+  admins      GiftListAdmin[]
+  items       GiftItem[]
+  categories  Category[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([parentId])
+}
+
+// Join table granting a registered Parent admin rights over a GiftList.
+// All admins have equal permissions (edit, add/remove other admins, delete
+// the list); the last remaining admin of a list cannot be removed.
+model GiftListAdmin {
+  id        String   @id @default(cuid())
+  listId    String
+  list      GiftList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  parentId  String
+  parent    Parent   @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([listId, parentId])
+  @@index([parentId])
+}
+
+model GiftItem {
+  id             String         @id @default(cuid())
+  listId         String
+  list           GiftList       @relation(fields: [listId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  imageUrl       String?
+  priority       Priority       @default(MEDIUM)
+  categoryId     String?
+  category       Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  quantityWanted Int            @default(1)
+  position       Int            @default(0)
+  links          GiftItemLink[]
+  reservations   Reservation[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([listId])
+  @@index([categoryId])
+}
+
+// Per-list, editable classification for items (e.g. "Ropa", "Juguetes").
+// New lists are seeded with a default set (see DEFAULT_CATEGORIES in
+// lib/categories.ts) that admins can then rename/add to/delete freely —
+// categories are not shared across lists.
+model Category {
+  id        String     @id @default(cuid())
+  listId    String
+  list      GiftList   @relation(fields: [listId], references: [id], onDelete: Cascade)
+  name      String
+  // One of CATEGORY_COLORS in lib/categories.ts. Stored as free text (not a
+  // DB enum) so adding a palette color later doesn't need a migration;
+  // categoryColorClasses() falls back to the default for unknown values.
+  color     String     @default("sky")
+  position  Int        @default(0)
+  createdAt DateTime   @default(now())
+  items     GiftItem[]
+
+  @@unique([listId, name])
+  @@index([listId])
+}
+
+// A store link where the item could be bought. An item can list several,
+// e.g. to offer guests a choice of store or a size/color variant.
+model GiftItemLink {
+  id        String   @id @default(cuid())
+  itemId    String
+  item      GiftItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  label     String?
+  url       String
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([itemId])
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Reservation {
+  id          String            @id @default(cuid())
+  itemId      String
+  item        GiftItem          @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  // Which unit of the item this reservation occupies (0..quantityWanted-1).
+  // A hand-written partial unique index on (itemId, unitSlot) WHERE status = 'ACTIVE'
+  // makes double-booking a DB constraint violation for any quantity.
+  unitSlot    Int               @default(0)
+  guestName   String
+  guestEmail  String?
+  message     String?
+  status      ReservationStatus @default(ACTIVE)
+  createdAt   DateTime          @default(now())
+  cancelledAt DateTime?
+
+  @@index([itemId])
+  @@index([itemId, status])
+}
+
+enum ReservationStatus {
+  ACTIVE
+  CANCELLED
+}
