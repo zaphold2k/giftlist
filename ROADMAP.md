@@ -4,12 +4,13 @@ Plan por fases para llegar a un pipeline que verifique tests y coverage en cada
 PR, publique imágenes taggeadas por branch, y genere un release al mergear a
 `main`.
 
-**Estado actual: las 5 fases están implementadas.** `.github/workflows/ci.yml`
-corre los jobs `verify`, `test`, `migrations` y `docker` en cada PR y push;
+**Estado actual: las 5 fases están implementadas**, incluyendo `arm64`
+(Raspberry Pi 4B) del backlog de la Fase 5. `.github/workflows/ci.yml` corre
+los jobs `verify`, `test`, `migrations` y `docker` en cada PR y push;
 `.github/workflows/release.yml` (release-please) genera el release al mergear
 a `main`. Este documento queda como referencia de las decisiones tomadas y
-las trampas del repo — no como un plan pendiente. El backlog de la Fase 5
-(E2E Playwright, `arm64`) sigue sin implementar a propósito, ver esa sección.
+las trampas del repo — no como un plan pendiente. Solo **E2E Playwright**
+sigue sin implementar a propósito, ver Fase 5.
 
 Las fases se ejecutaron en este orden porque un gate de coverage sobre 0% no
 significa nada: primero había que fundar la base de tests.
@@ -22,7 +23,7 @@ significa nada: primero había que fundar la base de tests.
 | Test runner | Vitest, unit + integración sobre `lib/` contra una SQLite temporal |
 | Gate de coverage | Ratchet contra `main`: el PR falla solo si el coverage **baja** |
 | Versionado | `release-please` con Conventional Commits |
-| Arquitecturas | `linux/amd64` únicamente al inicio |
+| Arquitecturas | `linux/amd64` + `linux/arm64` (Raspberry Pi 4B), `arm64` vía QEMU |
 
 ## Trampas de este repo (aplican a todas las fases)
 
@@ -151,13 +152,23 @@ retroceder, y sube solo a medida que se escriben tests.
   ensuciar el registry con una imagen por cada sync del PR.
   Pushes a rama: `push: true`.
 - `cache-from` / `cache-to: type=gha` — ver trampa 3.
-- Solo `linux/amd64`. `arm64` queda pendiente: exige QEMU y compilar
-  `better-sqlite3` emulado, lo que multiplica el tiempo de build. Se agrega
-  recién si hay un target ARM real.
-- **Smoke test** post-build: `docker run` con `AUTH_SECRET` dummy; esperar 200
-  en `/api/health` (Fase 5). Valida lo que un `docker build` no valida: que
-  `docker-entrypoint.sh` corra `migrate deploy` sobre una base vacía y que el
-  bundle standalone arranque.
+- **`linux/amd64` + `linux/arm64`** (Raspberry Pi 4B, 64-bit), este último vía
+  QEMU (`docker/setup-qemu-action`). `better-sqlite3` compila su binding nativo
+  emulado en el leg `arm64`, notablemente más lento que `amd64` — no es una
+  regresión, es esperable.
+- **Dos builds separados en el mismo job**, no uno: `buildx --load` no soporta
+  cargar un resultado multi-plataforma en el image store clásico de Docker
+  (`docker load` no entiende manifest lists). El primero construye solo
+  `amd64` con `load: true` (nunca se publica) para poder correr el smoke
+  test localmente; el segundo, solo en push real (no en PRs), construye
+  `amd64,arm64` con `push: true` y sin `load`. La cache de `type=gha` hace
+  que el segundo build reuse la capa `amd64` ya compilada en el primero.
+- **Smoke test** post-build: `docker run` con `AUTH_SECRET` dummy sobre la
+  imagen `amd64` del primer build; esperar 200 en `/api/health` (Fase 5).
+  Valida lo que un `docker build` no valida: que `docker-entrypoint.sh` corra
+  `migrate deploy` sobre una base vacía y que el bundle standalone arranque.
+  No se smoke-testea la imagen `arm64` — correrla emulada además de
+  compilarla emulada encarecería el job sin agregar mucha señal nueva.
 
 **Listo cuando**: pushear a una rama publica
 `ghcr.io/zaphold2k/giftlist:<branch>` y el smoke test pasa.
@@ -209,10 +220,12 @@ Implementado:
   `curl /` del smoke test y habilita el `healthcheck` de `docker-compose.yml`.
 - **Dependabot** (`.github/dependabot.yml`) para npm y para las GitHub
   Actions, semanal.
+- **`arm64`** (Raspberry Pi 4B): apareció el target de deploy real. Ver Fase 3
+  para el detalle de la implementación (dos builds separados, QEMU, sin
+  smoke test emulado).
 
 Pendiente, diferido a propósito:
 
 - **E2E Playwright** contra la imagen publicada. Suma minutos por PR y
   mantenimiento de selectores — `AGENTS.md` ya documenta que los locators por
   texto se rompen cuando un componente entra en modo edición.
-- **`arm64`** si aparece un target de deploy ARM.

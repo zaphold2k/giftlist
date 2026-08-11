@@ -95,6 +95,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # linux/arm64 (Raspberry Pi 4B) is cross-compiled via QEMU emulation —
+      # the runner itself is amd64. Registers the binfmt_misc handlers that
+      # both buildx and a plain `docker run --platform` need.
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
       - uses: docker/setup-buildx-action@v3
 
       - uses: docker/login-action@v3
@@ -114,14 +121,18 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
 
-      # PRs build to verify the image compiles, without pushing — that would
-      # publish an image to the registry on every sync of an open PR.
+      # Single-platform (amd64) build, loaded into the local Docker engine
+      # for the smoke test below. Never pushed on its own. Multi-platform
+      # results can't be `--load`-ed on the classic (non-containerd) image
+      # store these runners use — `docker load` has no concept of a
+      # manifest list — so this stays a separate step from the multi-arch
+      # build/push further down instead of one combined step.
       - uses: docker/build-push-action@v6
         id: build
         with:
           context: .
           platforms: linux/amd64
-          push: ${{ github.event_name != 'pull_request' }}
+          push: false
           load: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -154,3 +165,19 @@ jobs:
             echo "El contenedor no respondió 200 en /api/health dentro de los 30s" >&2
             exit 1
           fi
+
+      # PRs stop after the smoke test above — this only runs on a real push
+      # (branch or release tag), so it's the sole step that publishes to
+      # the registry. arm64 is emulated (see setup-qemu-action above), so
+      # better-sqlite3's native build here is meaningfully slower than the
+      # amd64 leg — expected, not a regression.
+      - uses: docker/build-push-action@v6
+        if: github.event_name != 'pull_request'
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
