@@ -197,6 +197,16 @@ export async function deleteItem(itemId: string): Promise<void> {
   revalidatePath(`/dashboard/lists/${item.listId}`);
 }
 
+export async function toggleItemHidden(itemId: string): Promise<void> {
+  const item = await requireOwnedItem(itemId);
+  await prisma.giftItem.update({
+    where: { id: itemId },
+    data: { hidden: !item.hidden },
+  });
+  revalidatePath(`/dashboard/lists/${item.listId}`);
+  revalidatePath(`/l/${item.list.slug}`);
+}
+
 export async function addCategory(
   listId: string,
   _prev: FormState,

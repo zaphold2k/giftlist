@@ -50,6 +50,7 @@ export default async function PublicListPage({
         // No orderBy here: items get regrouped by category and explicitly
         // re-sorted below, so any DB-level order would be immediately
         // discarded — don't add one back without removing that grouping.
+        where: { hidden: false },
         include: {
           links: { orderBy: { position: "asc" } },
           category: { select: { id: true, name: true, color: true, position: true } },

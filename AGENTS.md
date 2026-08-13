@@ -71,6 +71,17 @@ La vista pública (`app/l/[slug]/page.tsx`) agrupa los artículos por categoría
 - `components/category-index.tsx` (`CategoryIndex`) renderiza un `<nav>` `fixed` a la izquierda con un link por sección (mismo array `groups`, mismo orden). Se oculta si hay 0 o 1 secciones (no tiene sentido "saltar" entre una sola). Es un Server Component — la navegación es con anchors `<a href="#...">` nativos, sin JS ni scrollspy; el smooth scroll es CSS (`scroll-smooth` en el `<html>` de `app/layout.tsx`) + `scroll-mt-6` en cada `<section>`. No resalta la sección visible actualmente (no hay IntersectionObserver) — si se pide eso, es la próxima vuelta natural sobre esto.
 - Solo aparece en pantallas `lg:` en adelante (`hidden lg:flex`) — en mobile no hay lugar al costado del contenido centrado.
 
+### Ocultar artículos de la vista pública
+
+Un `GiftItem` puede marcarse `hidden` (Boolean, default `false`) para sacarlo de la vista pública (`/l/[slug]`) sin borrarlo — pensado para artículos en "etapa indecisa" que el admin todavía no quiere mostrar a los invitados.
+
+- El artículo sigue existiendo y siendo editable en el dashboard normalmente; `hidden` no afecta ninguna otra lógica (reservas, posición, categoría).
+- Toggle vía `toggleItemHidden(itemId)` (`app/(dashboard)/dashboard/actions.ts`) — acción minimalista igual que `deleteItem` (no pasa por `itemSchema`/`parseItemForm`, porque es un cambio de estado de visibilidad, no una edición de contenido), lee el valor actual vía `requireOwnedItem` y lo invierte. No usa `$transaction`/`withRetry`: no hay invariante que proteger en un toggle simple de un solo admin, a diferencia de "quitar el último admin".
+- UI: botón "Ocultar"/"Mostrar" en `components/item-row.tsx`, entre "Editar" y "Eliminar", sin `confirm()` (es reversible, no destructivo). Un ítem oculto se muestra atenuado (`opacity-60`) con un badge "Oculto" en el dashboard — nunca en la vista pública, ahí directamente no aparece.
+- El filtro va en el propio query de `app/l/[slug]/page.tsx` (`items: { where: { hidden: false }, ... }`), no post-fetch: así una categoría que solo tiene ítems ocultos no genera una sección vacía ni entra al índice flotante (`CategoryIndex`, ver abajo), porque `groupsByKey` nunca la ve.
+- Decisión consciente: si un ítem se oculta después de haber sido reservado, el guest que vuelve con `?reservado=` deja de ver el banner de confirmación (el array `items` ya viene filtrado sin ese ítem). No es un bug — el ítem no se muestra en absoluto, tiene sentido que tampoco se confirme nada de él.
+- Migración `prisma/migrations/20260813222404_item_hidden`: columna aditiva con default `false`, sin backfill necesario.
+
 ### Prioridad de artículo
 
 `Priority` (`LOW`/`MEDIUM`/`HIGH`) sigue siendo un enum fijo de Prisma (no como `Category`) — no se pidió que fuera editable. `PriorityBadge` (`components/priority-badge.tsx`) no renderiza nada para `MEDIUM`: es el valor "normal", etiquetarlo no aporta: solo se destacan los extremos.
