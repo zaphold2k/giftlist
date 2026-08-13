@@ -6,9 +6,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # giftlist — contexto para agentes
 
-Lista de regalos para bebé (estilo hellobb.net). Next.js 16 (App Router) + TypeScript + Tailwind + Prisma/SQLite + Auth.js. Setup, rutas y variables de entorno: ver `README.md`. Historial de features en `CHANGELOG.md`.
+Lista de regalos para bebé (estilo hellobb.net). Next.js 16 (App Router) + TypeScript + Tailwind + Prisma/SQLite + Auth.js. Setup, rutas y variables de entorno: ver `README.md`. Historial de versiones en `CHANGELOG.md`.
 
-**Mantener esta guía y `CHANGELOG.md` al día como parte del mismo commit de cada feature, no como un paso aparte al final.**
+**Mantener esta guía al día como parte del mismo commit de cada feature, no como un paso aparte al final.**
+
+**`CHANGELOG.md` ya no se edita a mano.** Desde que se agregó `release-please` (ver `ROADMAP.md` Fase 4), el changelog se genera a partir de los mensajes de commit ([Conventional Commits](https://www.conventionalcommits.org), obligatorios — ver `CODESTYLE.md` §14) cuando se mergea el PR de release. Editarlo a mano genera conflictos con ese PR. Lo único que un feature necesita del historial de versiones es un commit bien tipado (`feat:`, `fix:`, etc.) con un mensaje que tenga sentido como entrada de changelog.
 
 ## Convenciones establecidas
 
@@ -17,7 +19,7 @@ Lista de regalos para bebé (estilo hellobb.net). Next.js 16 (App Router) + Type
 - **Condiciones de carrera**: SQLite serializa transacciones de escritura (ver comentario en `lib/reservations.ts`). Para operaciones "leer-contar-decidir-escribir" (ej. no permitir quitar el último admin), envolver todo en `prisma.$transaction(...)` + `withRetry()` (`lib/with-retry.ts`), no hacer el chequeo y la escritura como pasos separados. Para checks de unicidad (nombre de categoría, etc.), el pre-check con `findFirst` es solo para dar un mensaje lindo — la guarda real es capturar el `P2002` del constraint único en un `try/catch` alrededor del `create`/`update`.
 - **Formularios con listas dinámicas** (enlaces de un artículo, filas de categoría): estado client-side con `useState`, se envían como arrays paralelos (`formData.getAll("campo")`) o inputs ocultos dentro del `<form>`. **Cuidado**: cualquier input (visible u oculto) que no esté anidado dentro del `<form>` correspondiente no viaja en el submit — pasó con el selector de color de categorías, quedó afuera del form y el color nunca se guardaba pese a que la UI se veía bien.
 - **Paletas de color en Tailwind**: para badges/swatches, usar un `Record<string, string>` con las clases completas escritas literalmente (ej. `"bg-rose-100 text-rose-700"`), nunca construir el nombre de clase dinámicamente (`` `bg-${color}-100` ``) — Tailwind v4 escanea el código fuente buscando strings literales, no evalúa template strings en runtime. Ver `lib/categories.ts`.
-- **Verificación**: no hay suite de tests. Verificar features con scripts Playwright ad-hoc en el scratchpad (login real, click through, screenshot, `console --errors`), no solo `tsc`/`eslint`/`next build`. Cuidado con locators basados en texto después de que un componente entra en modo edición: si el texto pasa a vivir dentro del `value` de un input, un selector `hasText` ya no lo encuentra (afectó varios tests este sesión).
+- **Verificación**: `npm run test:coverage` (Vitest, `tests/`) cubre `lib/` — autorización, condiciones de carrera, retries, validación, categorías, Turnstile — contra una SQLite descartable en `os.tmpdir()` (`tests/helpers/db.ts`), nunca `dev.db`. `DATABASE_URL` se fija en el `globalSetup` de Vitest antes de que se importe cualquier módulo, por la trampa de `lib/prisma.ts` descripta más abajo. Para UI y flujos completos, seguir verificando con scripts Playwright ad-hoc en el scratchpad (login real, click through, screenshot, `console --errors`) — los tests automatizados no cubren eso. Cuidado con locators basados en texto después de que un componente entra en modo edición: si el texto pasa a vivir dentro del `value` de un input, un selector `hasText` ya no lo encuentra (afectó varios tests este sesión).
 
 ## Desarrollo local — problemas conocidos
 

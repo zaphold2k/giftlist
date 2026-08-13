@@ -9,9 +9,14 @@ node_modules
 *.db-shm
 data
 dev.db
+tests
 scripts
+vitest.config.ts
+coverage
 README.md
 AGENTS.md
 CLAUDE.md
+CODESTYLE.md
+ROADMAP.md
 Dockerfile
 .dockerignore

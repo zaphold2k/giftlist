@@ -1,0 +1,183 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+env:
+  DATABASE_URL: "file:./dev.db"
+  AUTH_SECRET: "ci-placeholder-secret-not-used-at-runtime"
+  AUTH_TRUST_HOST: "true"
+  REGISTRY_IMAGE: ghcr.io/zaphold2k/giftlist
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx tsc --noEmit
+      - run: npm run lint
+      - run: npm run build
+
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run test:coverage
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/coverage-summary.json
+
+      # Ratchet against main's last successful run instead of a fixed
+      # threshold: a hardcoded number on top of today's coverage would be
+      # arbitrary — see ROADMAP.md Fase 2.
+      - name: Coverage ratchet
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: npx tsx scripts/coverage-ratchet.ts
+
+  migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npx prisma generate
+      # Applies every migration to a fresh, empty database — catches
+      # syntax errors in hand-edited migrations that a schema-only diff
+      # wouldn't (e.g. the backfill SQL in list_scoped_categories/item_links).
+      - run: npx prisma migrate deploy
+      # Catches drift between prisma/schema.prisma and what the migrations
+      # directory actually produces — the failure mode for a schema edit
+      # committed without its migration.
+      - name: Detect schema/migrations drift
+        run: |
+          npx prisma migrate diff \
+            --from-migrations ./prisma/migrations \
+            --to-schema ./prisma/schema.prisma \
+            --exit-code
+
+  docker:
+    needs: [verify, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # linux/arm64 (Raspberry Pi 4B) is cross-compiled via QEMU emulation —
+      # the runner itself is amd64. Registers the binfmt_misc handlers that
+      # both buildx and a plain `docker run --platform` need.
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,format=short
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      # Single-platform (amd64) build, loaded into the local Docker engine
+      # for the smoke test below. Never pushed on its own. Multi-platform
+      # results can't be `--load`-ed on the classic (non-containerd) image
+      # store these runners use — `docker load` has no concept of a
+      # manifest list — so this stays a separate step from the multi-arch
+      # build/push further down instead of one combined step.
+      - uses: docker/build-push-action@v6
+        id: build
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Validates what `docker build` can't: that docker-entrypoint.sh runs
+      # `migrate deploy` against an empty database and the standalone bundle
+      # actually starts and serves a request.
+      - name: Smoke test
+        run: |
+          IMAGE="$(echo '${{ steps.meta.outputs.tags }}' | head -n1)"
+          docker run -d --name smoke -p 3000:3000 \
+            -e AUTH_SECRET="smoke-test-secret-not-for-production" \
+            "$IMAGE"
+
+          ok=""
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/api/health >/dev/null; then
+              ok=1
+              break
+            fi
+            sleep 1
+          done
+
+          docker logs smoke
+          docker stop smoke
+
+          if [ -z "$ok" ]; then
+            echo "El contenedor no respondió 200 en /api/health dentro de los 30s" >&2
+            exit 1
+          fi
+
+      # PRs stop after the smoke test above — this only runs on a real push
+      # (branch or release tag), so it's the sole step that publishes to
+      # the registry. arm64 is emulated (see setup-qemu-action above), so
+      # better-sqlite3's native build here is meaningfully slower than the
+      # amd64 leg — expected, not a regression.
+      - uses: docker/build-push-action@v6
+        if: github.event_name != 'pull_request'
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
