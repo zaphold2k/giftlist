@@ -127,7 +127,7 @@ jobs:
       # store these runners use — `docker load` has no concept of a
       # manifest list — so this stays a separate step from the multi-arch
       # build/push further down instead of one combined step.
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         id: build
         with:
           context: .
@@ -171,7 +171,7 @@ jobs:
       # the registry. arm64 is emulated (see setup-qemu-action above), so
       # better-sqlite3's native build here is meaningfully slower than the
       # amd64 leg — expected, not a regression.
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         if: github.event_name != 'pull_request'
         with:
           context: .
