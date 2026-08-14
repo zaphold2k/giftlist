@@ -67,6 +67,7 @@ model GiftItem {
   categoryId     String?
   category       Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   quantityWanted Int            @default(1)
+  hidden         Boolean        @default(false)
   position       Int            @default(0)
   links          GiftItemLink[]
   reservations   Reservation[]

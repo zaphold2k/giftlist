@@ -11,6 +11,7 @@ export function ItemRow({
   categories,
   updateAction,
   deleteAction,
+  toggleHiddenAction,
 }: {
   item: {
     id: string;
@@ -22,10 +23,12 @@ export function ItemRow({
     category: { id: string; name: string; color: string } | null;
     quantityWanted: number;
     activeReservations: number;
+    hidden: boolean;
   };
   categories: { id: string; name: string }[];
   updateAction: (state: FormState, formData: FormData) => Promise<FormState>;
   deleteAction: () => Promise<void>;
+  toggleHiddenAction: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
 
@@ -44,7 +47,9 @@ export function ItemRow({
   }
 
   return (
-    <li className="flex items-center justify-between gap-4 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+    <li
+      className={`flex items-center justify-between gap-4 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm ${item.hidden ? "opacity-60" : ""}`}
+    >
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium text-zinc-900">{item.name}</span>
@@ -53,6 +58,11 @@ export function ItemRow({
           {item.quantityWanted > 1 && (
             <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600">
               ×{item.quantityWanted}
+            </span>
+          )}
+          {item.hidden && (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+              Oculto
             </span>
           )}
         </div>
@@ -72,6 +82,14 @@ export function ItemRow({
         >
           Editar
         </button>
+        <form action={toggleHiddenAction}>
+          <button
+            type="submit"
+            className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 transition hover:bg-zinc-50"
+          >
+            {item.hidden ? "Mostrar" : "Ocultar"}
+          </button>
+        </form>
         <form
           action={deleteAction}
           onSubmit={(e) => {

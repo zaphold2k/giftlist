@@ -15,6 +15,7 @@ import {
   addItem,
   updateItem,
   deleteItem,
+  toggleItemHidden,
   addListAdmin,
   removeListAdmin,
   addCategory,
@@ -147,10 +148,12 @@ export default async function EditListPage({
                   category: item.category,
                   quantityWanted: item.quantityWanted,
                   activeReservations: item.reservations.length,
+                  hidden: item.hidden,
                 }}
                 categories={list.categories}
                 updateAction={updateItem.bind(null, item.id)}
                 deleteAction={deleteItem.bind(null, item.id)}
+                toggleHiddenAction={toggleItemHidden.bind(null, item.id)}
               />
             ))}
           </ul>
