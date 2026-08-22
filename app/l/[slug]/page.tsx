@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { categorySwatchClassesOrNeutral } from "@/lib/categories";
 import { isTurnstileConfigured } from "@/lib/turnstile";
-import { PriorityBadge } from "@/components/priority-badge";
+import { sortItemsForPublicView } from "@/lib/item-order";
 import { CategoryBadge } from "@/components/category-badge";
 import { CategoryIndex, categoryAnchorId } from "@/components/category-index";
 import { ReservationForm } from "@/components/reservation-form";
@@ -69,12 +69,13 @@ export default async function PublicListPage({
 
   const items = list.items;
 
-  // Group by category (position order; uncategorized last), items within a
-  // group ascending by how many units are wanted — the point is guests see
-  // the "just one, easy to fully cover" gifts before big-ticket asks.
-  // Deliberate: priority no longer drives order here (it did before this
-  // grouping existed) — PriorityBadge is still shown, it just isn't a sort
-  // key anymore.
+  // Group by category (position order; uncategorized last). Within a group,
+  // sortItemsForPublicView (lib/item-order.ts) orders by availability, then
+  // priority (HIGH first), then remaining units descending, then `position`
+  // as a stable tiebreaker. This reinstates priority as a real sort key —
+  // an earlier version of this grouping deliberately dropped it — but
+  // PriorityBadge itself is no longer rendered on this page: it stays
+  // dashboard-only so guests don't see the admin's internal ranking signal.
   type Item = (typeof items)[number];
   type Group = { id: string | null; name: string; color: string | null; position: number; items: Item[] };
   const groupsByKey = new Map<string, Group>();
@@ -95,7 +96,7 @@ export default async function PublicListPage({
   }
   const groups = [...groupsByKey.values()].sort((a, b) => a.position - b.position);
   for (const group of groups) {
-    group.items.sort((a, b) => a.quantityWanted - b.quantityWanted || a.position - b.position);
+    group.items = sortItemsForPublicView(group.items);
   }
 
   return (
@@ -172,7 +173,6 @@ export default async function PublicListPage({
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-semibold text-zinc-900">{item.name}</h3>
-                        <PriorityBadge priority={item.priority} />
                         <CategoryBadge category={item.category} />
                       </div>
                       {item.description && (
