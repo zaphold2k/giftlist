@@ -15,6 +15,15 @@ type OrderableItem = {
 };
 
 /**
+ * Units of an item not covered by an active reservation. Shared between the
+ * sort below and the public-view render (app/l/[slug]/page.tsx) so both
+ * agree on what "remaining" means if reservation-counting semantics change.
+ */
+export function remainingUnits(item: { quantityWanted: number; reservations: { id: string }[] }): number {
+  return item.quantityWanted - item.reservations.length;
+}
+
+/**
  * Sort order for the public list view, within a category section:
  * 1. Items still available (remaining > 0) before fully reserved ones.
  * 2. Priority, HIGH before MEDIUM before LOW.
@@ -24,8 +33,8 @@ type OrderableItem = {
  */
 export function sortItemsForPublicView<T extends OrderableItem>(items: T[]): T[] {
   return [...items].sort((a, b) => {
-    const remainingA = a.quantityWanted - a.reservations.length;
-    const remainingB = b.quantityWanted - b.reservations.length;
+    const remainingA = remainingUnits(a);
+    const remainingB = remainingUnits(b);
 
     const availableA = remainingA > 0;
     const availableB = remainingB > 0;

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { categorySwatchClassesOrNeutral } from "@/lib/categories";
 import { isTurnstileConfigured } from "@/lib/turnstile";
-import { sortItemsForPublicView } from "@/lib/item-order";
+import { remainingUnits, sortItemsForPublicView } from "@/lib/item-order";
 import { CategoryBadge } from "@/components/category-badge";
 import { CategoryIndex, categoryAnchorId } from "@/components/category-index";
 import { ReservationForm } from "@/components/reservation-form";
@@ -152,7 +152,7 @@ export default async function PublicListPage({
             </h2>
             {group.items.map((item) => {
               const reserved = item.reservations.length;
-              const remaining = item.quantityWanted - reserved;
+              const remaining = remainingUnits(item);
               const fullyReserved = remaining <= 0;
 
               return (

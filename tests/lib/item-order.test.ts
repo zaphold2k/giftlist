@@ -38,6 +38,18 @@ describe("sortItemsForPublicView", () => {
     expect(sorted.map((i) => i.id)).toEqual(["high", "medium", "low"]);
   });
 
+  it("ranks priority as a strictly higher-precedence tier than remaining units", () => {
+    // A HIGH item with little left must still outrank a LOW item with lots
+    // left — priority is a hard tier, not folded into a weighted score with
+    // remaining units.
+    const highFewRemaining = item({ id: "high-few", priority: "HIGH", quantityWanted: 1, reservedCount: 0 });
+    const lowManyRemaining = item({ id: "low-many", priority: "LOW", quantityWanted: 5, reservedCount: 0 });
+
+    const sorted = sortItemsForPublicView([lowManyRemaining, highFewRemaining]);
+
+    expect(sorted.map((i) => i.id)).toEqual(["high-few", "low-many"]);
+  });
+
   it("breaks a priority tie by remaining units descending", () => {
     const fewRemaining = item({ id: "few", priority: "MEDIUM", quantityWanted: 3, reservedCount: 2 });
     const manyRemaining = item({ id: "many", priority: "MEDIUM", quantityWanted: 3, reservedCount: 0 });
