@@ -65,7 +65,7 @@ Un `GiftItem` puede tener una `Category` opcional para clasificarlo. **No es un 
 
 La vista pública (`app/l/[slug]/page.tsx`) agrupa los artículos por categoría en vez de listarlos planos.
 
-- Orden de las secciones: por `Category.position` (mismo orden en que aparecen en el panel "Categorías" del dashboard); los artículos sin categoría van en una sección final "Sin categoría". Dentro de cada sección, los artículos van ascendente por `quantityWanted` (cuántas unidades se piden — no por `remaining`, que cambiaría de orden a medida que se reservan cosas), con `position` como desempate estable. **`priority` ya no ordena nada acá** (antes de esta feature sí) — `PriorityBadge` se sigue mostrando, pero es puramente informativo, no una clave de orden. Si algo parece ordenado "raro" por prioridad, no es un bug, es este cambio.
+- Orden de las secciones: por `Category.position` (mismo orden en que aparecen en el panel "Categorías" del dashboard); los artículos sin categoría van en una sección final "Sin categoría". Dentro de cada sección, `sortItemsForPublicView` (`lib/item-order.ts`) ordena los artículos en 4 niveles: (1) disponibilidad (`remaining > 0` antes que artículos completos), (2) prioridad (`HIGH` → `MEDIUM` → `LOW`), (3) `remaining` (`quantityWanted` menos reservas activas) descendente, (4) `position` como desempate final estable. Esto es un cambio consciente sobre una decisión anterior de esta misma sección, que había sacado la prioridad como criterio de orden — ahora vuelve a tener peso real, y por eso `PriorityBadge` deja de mostrarse acá (ver "Prioridad de artículo" abajo): no tiene sentido exponer al público una señal que el admin usa como orden interno.
 - El agrupado se arma en el propio Server Component con un `Map` (`groupsByKey` → `groups` ordenado), no hay query adicional: la categoría de cada item ya viaja en el `include` existente.
 - Cada sección es un `<section id={categoryAnchorId(group.id)}>` (helper en `components/category-index.tsx`) — es el ancla que usa el índice.
 - `components/category-index.tsx` (`CategoryIndex`) renderiza un `<nav>` `fixed` a la izquierda con un link por sección (mismo array `groups`, mismo orden). Se oculta si hay 0 o 1 secciones (no tiene sentido "saltar" entre una sola). Es un Server Component — la navegación es con anchors `<a href="#...">` nativos, sin JS ni scrollspy; el smooth scroll es CSS (`scroll-smooth` en el `<html>` de `app/layout.tsx`) + `scroll-mt-6` en cada `<section>`. No resalta la sección visible actualmente (no hay IntersectionObserver) — si se pide eso, es la próxima vuelta natural sobre esto.
@@ -73,7 +73,7 @@ La vista pública (`app/l/[slug]/page.tsx`) agrupa los artículos por categoría
 
 ### Prioridad de artículo
 
-`Priority` (`LOW`/`MEDIUM`/`HIGH`) sigue siendo un enum fijo de Prisma (no como `Category`) — no se pidió que fuera editable. `PriorityBadge` (`components/priority-badge.tsx`) no renderiza nada para `MEDIUM`: es el valor "normal", etiquetarlo no aporta: solo se destacan los extremos.
+`Priority` (`LOW`/`MEDIUM`/`HIGH`) sigue siendo un enum fijo de Prisma (no como `Category`) — no se pidió que fuera editable. `PriorityBadge` (`components/priority-badge.tsx`) no renderiza nada para `MEDIUM`: es el valor "normal", etiquetarlo no aporta: solo se destacan los extremos. **La etiqueta es dashboard-only**: la vista pública (`app/l/[slug]/page.tsx`) ya no la renderiza — la prioridad sigue influyendo el orden que ve el invitado (ver sección anterior), pero el valor en sí queda como una señal interna del admin.
 
 ### Docker / docker-compose
 

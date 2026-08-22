@@ -49,3 +49,4 @@ next-env.d.ts
 /data/
 
 /app/generated/prisma
+FEATURE.md
